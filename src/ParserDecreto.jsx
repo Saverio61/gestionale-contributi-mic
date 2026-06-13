@@ -1,28 +1,75 @@
 import { useState, useCallback } from "react";
 
-const PROMPT_SISTEMA = `Sei un parser specializzato per i decreti MIC/FNSV italiani.
-Estrai i dati dalle tabelle e restituisci SOLO JSON valido, senza testo, senza backtick.
-JSON MINIFICATO: nessuno spazio extra, nessuna newline tra campi.
+const SUPABASE_URL = "https://rgbqpybaeojhrbqgxtui.supabase.co/functions/v1/swift-function";
 
-Struttura:
-{"decreto":{"numero_rep":"string","data":"YYYY-MM-DD","anno_finanziario":number,"ente_erogante":"string","ambito":"string","fondo":"string","stanziamento_totale":number,"url_pdf":null},"sezioni":[{"articolo_dm":"string","descrizione_settore":"string","prima_istanza_triennale":boolean,"stanziamento_totale_art":number,"sottoinsiemi":[{"numero_sottoinsieme":number,"risorse_assegnate":number,"organismi":[{"posizione":number,"denominazione":"string","comune":"string","sigla_provincia":"string","punteggio_vd":number,"punteggio_qa":number,"punteggio_qi":number,"punteggio_da":number,"punteggio_tot":number,"contributo_2026":number}]}]}]}
+const PROMPT_CHUNK = `Sei un parser per decreti MIC/FNSV italiani.
+Estrai i dati dalle tabelle e restituisci SOLO JSON valido minificato senza spazi extra.
+
+Per ogni tabella che trovi restituisci:
+{"articolo_dm":"string","descrizione_settore":"string","prima_istanza_triennale":boolean,"stanziamento_totale_art":number,"risorse_assegnate":number,"numero_sottoinsieme":number,"organismi":[{"posizione":number,"denominazione":"string","comune":"string","sigla_provincia":"string","punteggio_vd":number,"punteggio_qa":number,"punteggio_qi":number,"punteggio_da":number,"punteggio_tot":number,"contributo_2026":number}]}
 
 Regole:
-- numero_rep: solo numero es "770"
-- data: converti "11 giugno 2026" a "2026-06-11"
-- stanziamento_totale: totale FNSV in euro come numero
+- articolo_dm: es "Art. 42"
+- prima_istanza_triennale: true se la tabella contiene "Prime istanze triennali"
 - stanziamento_totale_art: riga "Stanziamento totale art."
-- risorse_assegnate: riga "Primo/Secondo/Terzo sottoinsieme - Risorse assegnate"
-- se un settore ha un solo sottoinsieme usa numero_sottoinsieme:1
+- risorse_assegnate: riga "Risorse assegnate"
+- numero_sottoinsieme: 1 se primo, 2 se secondo, ecc.
 - da "Torino (TO)" estrai comune:"Torino" sigla_provincia:"TO"
-- importi come numeri puri es 554419.00
+- importi come numeri es 554419.00
 - punteggi come decimali es 35.00
-- includi TUTTI gli organismi di TUTTE le tabelle`;
+Se ci sono piu tabelle nel testo restituisci un array JSON: [...]`;
+
+const PROMPT_DECRETO = `Estrai solo i metadati del decreto (non le tabelle) e restituisci SOLO JSON:
+{"numero_rep":"string","data":"YYYY-MM-DD","anno_finanziario":number,"ambito":"string","stanziamento_totale":number}
+- numero_rep: solo il numero es "573"
+- data: es "2026-06-11"
+- ambito: es "Multidisciplinare"
+- stanziamento_totale: totale FNSV in euro`;
 
 const fmt = (n) =>
   n != null
     ? new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n)
     : "--";
+
+async function chiamaClaude(prompt, testo) {
+  const response = await fetch(SUPABASE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4000,
+      messages: [
+        { role: "user", content: prompt + "\n\n" + testo }
+      ],
+    }),
+  });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const data = await response.json();
+  let txt = data.content?.find((b) => b.type === "text")?.text || "";
+  txt = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+  return JSON.parse(txt);
+}
+
+function dividiInChunk(testo) {
+  // Trova tutti gli articoli nel testo
+  const pattern = /(Art\.\s*\d+[^\n]*\n)/g;
+  const posizioni = [];
+  let match;
+  while ((match = pattern.exec(testo)) !== null) {
+    posizioni.push(match.index);
+  }
+  
+  if (posizioni.length === 0) return [testo];
+  
+  const chunks = [];
+  for (let i = 0; i < posizioni.length; i++) {
+    const inizio = posizioni[i];
+    const fine = i + 1 < posizioni.length ? posizioni[i + 1] : testo.length;
+    const chunk = testo.slice(inizio, fine);
+    if (chunk.trim().length > 50) chunks.push(chunk);
+  }
+  return chunks;
+}
 
 export default function ParserDecreto() {
   const [testo, setTesto] = useState("");
@@ -48,45 +95,47 @@ export default function ParserDecreto() {
     if (!testo.trim()) return;
     setStato("caricamento");
     setErrore("");
-    setProgress("Preparazione testo decreto...");
 
     try {
-      const inizioTabelle = testo.indexOf("D E C R E T A");
-      const testoTabelle = inizioTabelle > 0 ? testo.slice(inizioTabelle) : testo;
-      const testoTroncato = testoTabelle.length > 30000 ? testoTabelle.slice(0, 30000) : testoTabelle;
-
-      setProgress("Invio a Claude (30-60 secondi)...");
-
-      const response = await fetch("https://rgbqpybaeojhrbqgxtui.supabase.co/functions/v1/swift-function", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 16000,
-          system: PROMPT_SISTEMA,
-          messages: [
-            {
-              role: "user",
-              content: "Estrai tutti i dati da questo decreto MIC/FNSV:\n\n" + testoTroncato,
-            },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error?.message || "HTTP " + response.status);
+      // Trova inizio tabelle
+      const inizioDecreta = testo.indexOf("D E C R E T A");
+      const testoTabelle = inizioDecreta > 0 ? testo.slice(inizioDecreta) : testo;
+      
+      // 1. Estrai metadati decreto
+      setProgress("Estrazione metadati decreto (1/2)...");
+      const decretoMeta = await chiamaClaude(PROMPT_DECRETO, testo.slice(0, 3000));
+      
+      // 2. Dividi in chunk per articolo
+      const chunks = dividiInChunk(testoTabelle);
+      setProgress(`Elaborazione ${chunks.length} sezioni...`);
+      
+      const sezioni = [];
+      for (let i = 0; i < chunks.length; i++) {
+        setProgress(`Elaborazione sezione ${i + 1} di ${chunks.length}...`);
+        try {
+          const risultatoChunk = await chiamaClaude(PROMPT_CHUNK, chunks[i]);
+          const lista = Array.isArray(risultatoChunk) ? risultatoChunk : [risultatoChunk];
+          for (const s of lista) {
+            if (s.organismi && s.organismi.length > 0) {
+              sezioni.push({
+                articolo_dm: s.articolo_dm,
+                descrizione_settore: s.descrizione_settore,
+                prima_istanza_triennale: s.prima_istanza_triennale || false,
+                stanziamento_totale_art: s.stanziamento_totale_art,
+                sottoinsiemi: [{
+                  numero_sottoinsieme: s.numero_sottoinsieme || 1,
+                  risorse_assegnate: s.risorse_assegnate,
+                  organismi: s.organismi,
+                }],
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Chunk " + i + " saltato:", e.message);
+        }
       }
 
-      const data = await response.json();
-      const testo_risposta = data.content?.find((b) => b.type === "text")?.text || "";
-
-      setProgress("Parsing JSON...");
-
-      let json_pulito = testo_risposta.trim();
-      json_pulito = json_pulito.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
-
-      const parsed = JSON.parse(json_pulito);
+      const parsed = { decreto: decretoMeta, sezioni };
       setRisultato(parsed);
       setStato("estratto");
       setProgress("");
@@ -103,7 +152,7 @@ export default function ParserDecreto() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "decreto_" + (risultato.decreto?.numero_rep || "export") + "_" + (risultato.decreto?.anno_finanziario || "") + ".json";
+    a.download = "decreto_" + (risultato.decreto?.numero_rep || "export") + ".json";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -127,7 +176,7 @@ export default function ParserDecreto() {
         <div style={{ borderLeft: "4px solid #B8860B", paddingLeft: 16 }}>
           <div style={{ fontSize: 11, color: "#B8860B", fontFamily: "monospace", letterSpacing: 2, textTransform: "uppercase" }}>MIC / FNSV</div>
           <div style={{ fontSize: 18, fontWeight: 800 }}>Parser Decreti</div>
-          <div style={{ fontSize: 12, color: "#9BB5D4", marginTop: 2 }}>Estrazione automatica via Supabase Edge Function</div>
+          <div style={{ fontSize: 12, color: "#9BB5D4", marginTop: 2 }}>Estrazione automatica a chunk via Supabase</div>
         </div>
       </div>
 
@@ -234,11 +283,6 @@ export default function ParserDecreto() {
                     </div>
                     {sez.sottoinsiemi?.map((sub, subi) => (
                       <div key={subi} style={{ marginBottom: 16 }}>
-                        {sez.sottoinsiemi.length > 1 && (
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase" }}>
-                            {["Primo", "Secondo", "Terzo"][sub.numero_sottoinsieme - 1] || sub.numero_sottoinsieme + "o"} sottoinsieme - {fmt(sub.risorse_assegnate)}
-                          </div>
-                        )}
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                           <thead>
                             <tr style={{ background: "#F7F4EE" }}>
@@ -272,16 +316,6 @@ export default function ParserDecreto() {
                 {JSON.stringify(risultato, null, 2)}
               </pre>
             )}
-          </div>
-
-          <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#1C1C1C", marginBottom: 10 }}>Prossimo passo: INSERT in Supabase</div>
-            <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.7 }}>
-              Il JSON scaricato contiene tutti i dati strutturati pronti per l inserimento nelle tabelle:
-              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px" }}>decreti</code>
-              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px" }}>organismi</code>
-              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px" }}>assegnazioni</code>
-            </div>
           </div>
         </>
       )}
