@@ -92,7 +92,7 @@ export default function ParserDecreto() {
     try {
       const inizioTabelle = testo.indexOf("D E C R E T A");
       const testoTabelle = inizioTabelle > 0 ? testo.slice(inizioTabelle) : testo;
-      const testoTroncato = testoTabelle.length > 60000 ? testoTabelle.slice(0, 60000) : testoTabelle;
+      const testoTroncato = testoTabelle.length > 30000 ? testoTabelle.slice(0, 30000) : testoTabelle;
 
       setProgress("Invio a Claude (30-60 secondi)...");
 
