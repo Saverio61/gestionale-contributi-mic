@@ -1,62 +1,23 @@
 import { useState, useCallback } from "react";
 
-const PROMPT_SISTEMA = `Sei un parser specializzato per i decreti MIC/FNSV italiani (Fondo Nazionale Spettacolo dal Vivo).
-Estrai TUTTI i dati dalle tabelle del decreto e restituisci SOLO un oggetto JSON valido, senza testo aggiuntivo, senza backtick, senza markdown.
+const PROMPT_SISTEMA = `Sei un parser specializzato per i decreti MIC/FNSV italiani.
+Estrai i dati dalle tabelle e restituisci SOLO JSON valido, senza testo, senza backtick.
+JSON MINIFICATO: nessuno spazio extra, nessuna newline tra campi.
 
-Struttura JSON da restituire:
-{
-  "decreto": {
-    "numero_rep": "string",
-    "data": "YYYY-MM-DD",
-    "anno_finanziario": number,
-    "ente_erogante": "string",
-    "ambito": "string",
-    "fondo": "string",
-    "stanziamento_totale": number,
-    "url_pdf": null
-  },
-  "sezioni": [
-    {
-      "articolo_dm": "string",
-      "descrizione_settore": "string",
-      "prima_istanza_triennale": boolean,
-      "stanziamento_totale_art": number,
-      "sottoinsiemi": [
-        {
-          "numero_sottoinsieme": number,
-          "risorse_assegnate": number,
-          "organismi": [
-            {
-              "posizione": number,
-              "denominazione": "string",
-              "comune": "string",
-              "sigla_provincia": "string",
-              "punteggio_vd": number,
-              "punteggio_qa": number,
-              "punteggio_qi": number,
-              "punteggio_da": number,
-              "punteggio_tot": number,
-              "contributo_2026": number
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
+Struttura:
+{"decreto":{"numero_rep":"string","data":"YYYY-MM-DD","anno_finanziario":number,"ente_erogante":"string","ambito":"string","fondo":"string","stanziamento_totale":number,"url_pdf":null},"sezioni":[{"articolo_dm":"string","descrizione_settore":"string","prima_istanza_triennale":boolean,"stanziamento_totale_art":number,"sottoinsiemi":[{"numero_sottoinsieme":number,"risorse_assegnate":number,"organismi":[{"posizione":number,"denominazione":"string","comune":"string","sigla_provincia":"string","punteggio_vd":number,"punteggio_qa":number,"punteggio_qi":number,"punteggio_da":number,"punteggio_tot":number,"contributo_2026":number}]}]}]}
 
-Regole di estrazione:
-- numero_rep: solo il numero (es. "770")
+Regole:
+- numero_rep: solo numero es "770"
 - data: converti "11 giugno 2026" a "2026-06-11"
-- stanziamento_totale: cerca "Fondo nazionale per lo spettacolo dal vivo" totale
-- per ogni tabella identifica: articolo DM, descrizione settore, se e "Prime istanze triennali"
-- stanziamento_totale_art: la riga "Stanziamento totale art."
-- risorse_assegnate: la riga "Primo/Secondo/Terzo sottoinsieme - Risorse assegnate"
-- se un settore ha un solo sottoinsieme senza numerazione esplicita, usa numero_sottoinsieme: 1
-- comune e sigla_provincia: da "Torino (TO)" estrai comune="Torino" e sigla_provincia="TO"
-- tutti gli importi come numeri puri senza simboli (es. 554419.00)
-- tutti i punteggi come numeri decimali (es. 35.00)
-- includi TUTTI gli organismi di TUTTE le tabelle, nessuno escluso`;
+- stanziamento_totale: totale FNSV in euro come numero
+- stanziamento_totale_art: riga "Stanziamento totale art."
+- risorse_assegnate: riga "Primo/Secondo/Terzo sottoinsieme - Risorse assegnate"
+- se un settore ha un solo sottoinsieme usa numero_sottoinsieme:1
+- da "Torino (TO)" estrai comune:"Torino" sigla_provincia:"TO"
+- importi come numeri puri es 554419.00
+- punteggi come decimali es 35.00
+- includi TUTTI gli organismi di TUTTE le tabelle`;
 
 const fmt = (n) =>
   n != null
@@ -124,8 +85,6 @@ export default function ParserDecreto() {
 
       let json_pulito = testo_risposta.trim();
       json_pulito = json_pulito.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
-      json_pulito = json_pulito.replace(/[\u0000-\u001F\u007F]/g, " ");
-      json_pulito = json_pulito.replace(/,\s*\}/g, "}").replace(/,\s*\]/g, "]");
 
       const parsed = JSON.parse(json_pulito);
       setRisultato(parsed);
