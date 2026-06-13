@@ -131,6 +131,9 @@ export default function ParserDecreto() {
       let json_pulito = testo_risposta.trim();
       json_pulito = json_pulito.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
 
+      // Pulizia aggressiva del JSON
+      json_pulito = json_pulito.replace(/[ -]/g, " ");
+      json_pulito = json_pulito.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
       const parsed = JSON.parse(json_pulito);
       setRisultato(parsed);
       setStato("estratto");
