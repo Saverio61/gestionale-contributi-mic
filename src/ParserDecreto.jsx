@@ -104,7 +104,7 @@ export default function ParserDecreto() {
 
     try {
       // Tronca il testo se troppo lungo (Claude gestisce ~200k token ma per sicurezza)
-      const testoTroncato = testo.length > 400000 ? testo.slice(0, 400000) : testo;
+     
 
       setProgress("Estrazione dati in corso (può richiedere 20-40 secondi)...");
 
@@ -163,7 +163,9 @@ const response = await fetch("/.netlify/functions/claude-proxy", {        method
   // Calcola totali
   const totali = risultato
     ? (() => {
-        let org = 0, importo = 0;
+        const inizioTabelle = testo.indexOf("D E C R E T A");
+const testoTabelle = inizioTabelle > 0 ? testo.slice(inizioTabelle) : testo;
+const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000) : testoTabelle;
         risultato.sezioni?.forEach((s) =>
           s.sottoinsiemi?.forEach((si) => {
             org += si.organismi?.length || 0;
