@@ -1,15 +1,13 @@
-const { ANTHROPIC_API_KEY } = process.env;
-
-exports.handler = async function (event, context) {
+exports.handler = async function(event, context) {
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, x-api-key, anthropic-version",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS"
       },
-      body: "",
+      body: ""
     };
   }
 
@@ -18,10 +16,10 @@ exports.handler = async function (event, context) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,,
-        "anthropic-version": "2023-06-01",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
       },
-      body: event.body,
+      body: event.body
     });
 
     const data = await response.json();
@@ -30,15 +28,17 @@ exports.handler = async function (event, context) {
       statusCode: response.status,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(data)
     };
   } catch (err) {
     return {
       statusCode: 500,
-      headers: { "Access-Control-Allow-Origin": "*" },
-      body: JSON.stringify({ error: err.message }),
+      headers: {
+        "Access-Control-Allow-Origin": "*"
+      },
+      body: JSON.stringify({ error: err.message })
     };
   }
 };
