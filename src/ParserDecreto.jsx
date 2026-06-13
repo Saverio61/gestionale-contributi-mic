@@ -47,11 +47,11 @@ Struttura JSON da restituire:
 
 Regole di estrazione:
 - numero_rep: solo il numero (es. "770")
-- data: converti "11 giugno 2026" → "2026-06-11"
-- stanziamento_totale: cerca "Fondo nazionale per lo spettacolo dal vivo" totale, es. 448178710
-- per ogni tabella identifica: articolo DM, descrizione settore, se è "Prime istanze triennali"
-- stanziamento_totale_art: la riga "Stanziamento totale art. €"
-- risorse_assegnate: la riga "Primo/Secondo/Terzo sottoinsieme - Risorse assegnate €"
+- data: converti "11 giugno 2026" a "2026-06-11"
+- stanziamento_totale: cerca "Fondo nazionale per lo spettacolo dal vivo" totale
+- per ogni tabella identifica: articolo DM, descrizione settore, se e "Prime istanze triennali"
+- stanziamento_totale_art: la riga "Stanziamento totale art."
+- risorse_assegnate: la riga "Primo/Secondo/Terzo sottoinsieme - Risorse assegnate"
 - se un settore ha un solo sottoinsieme senza numerazione esplicita, usa numero_sottoinsieme: 1
 - comune e sigla_provincia: da "Torino (TO)" estrai comune="Torino" e sigla_provincia="TO"
 - tutti gli importi come numeri puri senza simboli (es. 554419.00)
@@ -61,21 +61,16 @@ Regole di estrazione:
 const fmt = (n) =>
   n != null
     ? new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n)
-    : "—";
-
-const badge = (color, bg) => ({
-  display: "inline-block", padding: "2px 10px", borderRadius: 12,
-  fontSize: 11, fontWeight: 700, color, background: bg,
-});
+    : "--";
 
 export default function ParserDecreto() {
-  const [testo, setTesto]         = useState("");
-  const [nomeFile, setNomeFile]   = useState("");
-  const [stato, setStato]         = useState("idle");
+  const [testo, setTesto] = useState("");
+  const [nomeFile, setNomeFile] = useState("");
+  const [stato, setStato] = useState("idle");
   const [risultato, setRisultato] = useState(null);
-  const [errore, setErrore]       = useState("");
-  const [tab, setTab]             = useState("anteprima");
-  const [progress, setProgress]   = useState("");
+  const [errore, setErrore] = useState("");
+  const [tab, setTab] = useState("anteprima");
+  const [progress, setProgress] = useState("");
 
   const onFile = useCallback((e) => {
     const file = e.target.files[0];
@@ -95,12 +90,11 @@ export default function ParserDecreto() {
     setProgress("Preparazione testo decreto...");
 
     try {
-      // Taglia il preambolo legale e invia solo la parte con le tabelle
       const inizioTabelle = testo.indexOf("D E C R E T A");
       const testoTabelle = inizioTabelle > 0 ? testo.slice(inizioTabelle) : testo;
-      const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000) : testoTabelle;
+      const testoTroncato = testoTabelle.length > 60000 ? testoTabelle.slice(0, 60000) : testoTabelle;
 
-      setProgress("Invio a Claude (20-40 secondi)...");
+      setProgress("Invio a Claude (30-60 secondi)...");
 
       const response = await fetch("https://rgbqpybaeojhrbqgxtui.supabase.co/functions/v1/swift-function", {
         method: "POST",
@@ -112,7 +106,7 @@ export default function ParserDecreto() {
           messages: [
             {
               role: "user",
-              content: `Estrai tutti i dati da questo decreto MIC/FNSV:\n\n${testoTroncato}`,
+              content: "Estrai tutti i dati da questo decreto MIC/FNSV:\n\n" + testoTroncato,
             },
           ],
         }),
@@ -120,7 +114,7 @@ export default function ParserDecreto() {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `HTTP ${response.status}`);
+        throw new Error(err?.error?.message || "HTTP " + response.status);
       }
 
       const data = await response.json();
@@ -130,10 +124,9 @@ export default function ParserDecreto() {
 
       let json_pulito = testo_risposta.trim();
       json_pulito = json_pulito.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+      json_pulito = json_pulito.replace(/[\u0000-\u001F\u007F]/g, " ");
+      json_pulito = json_pulito.replace(/,\s*\}/g, "}").replace(/,\s*\]/g, "]");
 
-      // Pulizia aggressiva del JSON
-      json_pulito = json_pulito.replace(/[ -]/g, " ");
-      json_pulito = json_pulito.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
       const parsed = JSON.parse(json_pulito);
       setRisultato(parsed);
       setStato("estratto");
@@ -151,7 +144,7 @@ export default function ParserDecreto() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `decreto_${risultato.decreto?.numero_rep || "export"}_${risultato.decreto?.anno_finanziario || ""}.json`;
+    a.download = "decreto_" + (risultato.decreto?.numero_rep || "export") + "_" + (risultato.decreto?.anno_finanziario || "") + ".json";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -171,11 +164,11 @@ export default function ParserDecreto() {
 
   return (
     <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", background: "#F7F4EE", minHeight: "100vh", padding: 24 }}>
-      <div style={{ background: "#1A3A5C", color: "#fff", borderRadius: 8, padding: "16px 24px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ background: "#1A3A5C", color: "#fff", borderRadius: 8, padding: "16px 24px", marginBottom: 20 }}>
         <div style={{ borderLeft: "4px solid #B8860B", paddingLeft: 16 }}>
           <div style={{ fontSize: 11, color: "#B8860B", fontFamily: "monospace", letterSpacing: 2, textTransform: "uppercase" }}>MIC / FNSV</div>
           <div style={{ fontSize: 18, fontWeight: 800 }}>Parser Decreti</div>
-          <div style={{ fontSize: 12, color: "#9BB5D4", marginTop: 2 }}>Estrazione automatica → JSON → Supabase</div>
+          <div style={{ fontSize: 12, color: "#9BB5D4", marginTop: 2 }}>Estrazione automatica via Supabase Edge Function</div>
         </div>
       </div>
 
@@ -184,7 +177,7 @@ export default function ParserDecreto() {
         <label style={{
           display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
           border: "2px dashed #CBD5E1", borderRadius: 8, padding: "20px 24px",
-          background: nomeFile ? "#E8F0F8" : "#FAFAFA", transition: "all 0.2s",
+          background: nomeFile ? "#E8F0F8" : "#FAFAFA",
         }}>
           <span style={{ fontSize: 28 }}>📄</span>
           <div>
@@ -192,25 +185,19 @@ export default function ParserDecreto() {
               {nomeFile || "Clicca per scegliere un file .txt o .md"}
             </div>
             <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
-              {testo ? `${(testo.length / 1000).toFixed(0)} KB caricati` : "Testo copiato dal PDF del decreto"}
+              {testo ? (testo.length / 1000).toFixed(0) + " KB caricati" : "Testo copiato dal PDF del decreto"}
             </div>
           </div>
           <input type="file" accept=".txt,.md,.text" onChange={onFile} style={{ display: "none" }} />
         </label>
 
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6 }}>
-            Oppure incolla direttamente il testo del decreto:
-          </div>
+          <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6 }}>Oppure incolla direttamente il testo:</div>
           <textarea
             value={testo}
             onChange={(e) => { setTesto(e.target.value); setNomeFile("(testo incollato)"); }}
             placeholder="Incolla qui il testo copiato dal PDF..."
-            style={{
-              width: "100%", height: 120, padding: 10, borderRadius: 6,
-              border: "1px solid #E5E7EB", fontSize: 12, fontFamily: "monospace",
-              resize: "vertical", boxSizing: "border-box", color: "#1C1C1C",
-            }}
+            style={{ width: "100%", height: 120, padding: 10, borderRadius: 6, border: "1px solid #E5E7EB", fontSize: 12, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box", color: "#1C1C1C" }}
           />
         </div>
 
@@ -223,15 +210,13 @@ export default function ParserDecreto() {
             color: "#fff", fontWeight: 700, fontSize: 14, cursor: !testo.trim() || stato === "caricamento" ? "not-allowed" : "pointer",
           }}
         >
-          {stato === "caricamento" ? "⏳ Estrazione in corso..." : "🔍 Estrai dati con Claude"}
+          {stato === "caricamento" ? "Estrazione in corso..." : "Estrai dati con Claude"}
         </button>
 
-        {progress && (
-          <div style={{ marginTop: 10, fontSize: 12, color: "#2A5A8C", fontStyle: "italic" }}>{progress}</div>
-        )}
+        {progress && <div style={{ marginTop: 10, fontSize: 12, color: "#2A5A8C", fontStyle: "italic" }}>{progress}</div>}
         {stato === "errore" && (
           <div style={{ marginTop: 10, padding: "10px 14px", background: "#FEE2E2", borderRadius: 6, fontSize: 12, color: "#991B1B", fontWeight: 600 }}>
-            ❌ Errore: {errore}
+            Errore: {errore}
           </div>
         )}
       </div>
@@ -239,16 +224,16 @@ export default function ParserDecreto() {
       {risultato && (
         <>
           <div style={{ background: "#1A3A5C", color: "#fff", borderRadius: 8, padding: "16px 24px", marginBottom: 16, borderLeft: "4px solid #B8860B" }}>
-            <div style={{ fontFamily: "monospace", fontSize: 11, color: "#B8860B", letterSpacing: 1 }}>
-              D.D.G. REP. N. {risultato.decreto?.numero_rep} · {risultato.decreto?.data}
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "#B8860B" }}>
+              D.D.G. REP. N. {risultato.decreto?.numero_rep} - {risultato.decreto?.data}
             </div>
             <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4 }}>{risultato.decreto?.ambito}</div>
             <div style={{ display: "flex", gap: 24, marginTop: 10, flexWrap: "wrap" }}>
               <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Anno</span><br /><strong>{risultato.decreto?.anno_finanziario}</strong></div>
-              <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Stanziamento totale</span><br /><strong style={{ color: "#B8860B" }}>{fmt(risultato.decreto?.stanziamento_totale)}</strong></div>
-              <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Sezioni estratte</span><br /><strong>{totali?.sezioni}</strong></div>
-              <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Organismi totali</span><br /><strong style={{ color: "#4ADE80" }}>{totali?.org}</strong></div>
-              <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Importo verificato</span><br /><strong style={{ color: "#4ADE80" }}>{fmt(totali?.importo)}</strong></div>
+              <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Stanziamento</span><br /><strong style={{ color: "#B8860B" }}>{fmt(risultato.decreto?.stanziamento_totale)}</strong></div>
+              <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Sezioni</span><br /><strong>{totali?.sezioni}</strong></div>
+              <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Organismi</span><br /><strong style={{ color: "#4ADE80" }}>{totali?.org}</strong></div>
+              <div><span style={{ color: "#9BB5D4", fontSize: 11 }}>Importo</span><br /><strong style={{ color: "#4ADE80" }}>{fmt(totali?.importo)}</strong></div>
             </div>
           </div>
 
@@ -261,15 +246,15 @@ export default function ParserDecreto() {
                   color: tab === t ? "#1A3A5C" : "#6B7280",
                   borderBottom: tab === t ? "2px solid #1A3A5C" : "2px solid transparent",
                 }}>
-                  {t === "anteprima" ? "📋 Anteprima tabelle" : "{ } JSON grezzo"}
+                  {t === "anteprima" ? "Anteprima tabelle" : "JSON grezzo"}
                 </button>
               ))}
               <button onClick={scaricaJSON} style={{
-                marginLeft: "auto", margin: "8px 16px 8px auto", padding: "6px 16px",
+                marginLeft: "auto", margin: "8px 16px", padding: "6px 16px",
                 background: "#B8860B", color: "#fff", border: "none", borderRadius: 5,
                 fontSize: 12, fontWeight: 700, cursor: "pointer",
               }}>
-                ↓ Scarica JSON
+                Scarica JSON
               </button>
             </div>
 
@@ -279,53 +264,44 @@ export default function ParserDecreto() {
                   <div key={si} style={{ marginBottom: 28 }}>
                     <div style={{ background: "#E8F0F8", borderLeft: "3px solid #1A3A5C", padding: "8px 14px", borderRadius: "0 6px 6px 0", marginBottom: 12 }}>
                       <div style={{ fontWeight: 700, color: "#1A3A5C", fontSize: 13 }}>
-                        {sez.articolo_dm} — {sez.descrizione_settore}
+                        {sez.articolo_dm} - {sez.descrizione_settore}
                         {sez.prima_istanza_triennale && (
-                          <span style={{ ...badge("#166534", "#DCFCE7"), marginLeft: 8 }}>Prime istanze triennali</span>
+                          <span style={{ marginLeft: 8, background: "#DCFCE7", color: "#166534", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700 }}>Prime istanze</span>
                         )}
                       </div>
                       <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>
-                        Stanziamento totale art.: <strong>{fmt(sez.stanziamento_totale_art)}</strong>
+                        Stanziamento: <strong>{fmt(sez.stanziamento_totale_art)}</strong>
                       </div>
                     </div>
-
                     {sez.sottoinsiemi?.map((sub, subi) => (
                       <div key={subi} style={{ marginBottom: 16 }}>
                         {sez.sottoinsiemi.length > 1 && (
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 6, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1 }}>
-                            {["Primo", "Secondo", "Terzo"][sub.numero_sottoinsieme - 1] || sub.numero_sottoinsieme + "°"} sottoinsieme — {fmt(sub.risorse_assegnate)}
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase" }}>
+                            {["Primo", "Secondo", "Terzo"][sub.numero_sottoinsieme - 1] || sub.numero_sottoinsieme + "o"} sottoinsieme - {fmt(sub.risorse_assegnate)}
                           </div>
                         )}
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                           <thead>
                             <tr style={{ background: "#F7F4EE" }}>
-                              {["#", "Organismo", "Comune (Prov.)", "VD", "QA", "QI", "DA", "TOT", "Contributo"].map(h => (
-                                <th key={h} style={{ padding: "6px 8px", textAlign: h === "#" || ["VD","QA","QI","DA","TOT"].includes(h) ? "center" : "left", fontWeight: 700, color: "#6B7280", fontSize: 10, textTransform: "uppercase", borderBottom: "1px solid #E5E7EB", whiteSpace: "nowrap" }}>{h}</th>
+                              {["#", "Organismo", "Comune", "VD", "QA", "QI", "DA", "TOT", "Contributo"].map(h => (
+                                <th key={h} style={{ padding: "6px 8px", textAlign: "left", fontWeight: 700, color: "#6B7280", fontSize: 10, textTransform: "uppercase", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {sub.organismi?.map((o, oi) => (
                               <tr key={oi} style={{ borderBottom: "1px solid #F3F4F6", background: oi % 2 === 0 ? "#fff" : "#FAFAFA" }}>
-                                <td style={{ padding: "6px 8px", textAlign: "center", color: "#9CA3AF", fontFamily: "monospace" }}>{o.posizione}</td>
+                                <td style={{ padding: "6px 8px", color: "#9CA3AF" }}>{o.posizione}</td>
                                 <td style={{ padding: "6px 8px", fontWeight: 600, color: "#1C1C1C", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.denominazione}</td>
-                                <td style={{ padding: "6px 8px", color: "#6B7280", whiteSpace: "nowrap" }}>{o.comune} <span style={{ fontFamily: "monospace", fontWeight: 700 }}>({o.sigla_provincia})</span></td>
+                                <td style={{ padding: "6px 8px", color: "#6B7280", whiteSpace: "nowrap" }}>{o.comune} ({o.sigla_provincia})</td>
                                 {[o.punteggio_vd, o.punteggio_qa, o.punteggio_qi, o.punteggio_da].map((v, vi) => (
-                                  <td key={vi} style={{ padding: "6px 8px", textAlign: "center", fontFamily: "monospace", color: "#374151" }}>{v?.toFixed(2)}</td>
+                                  <td key={vi} style={{ padding: "6px 8px", fontFamily: "monospace", color: "#374151" }}>{v?.toFixed(2)}</td>
                                 ))}
-                                <td style={{ padding: "6px 8px", textAlign: "center", fontFamily: "monospace", fontWeight: 800, color: "#1A3A5C", fontSize: 12 }}>{o.punteggio_tot?.toFixed(2)}</td>
+                                <td style={{ padding: "6px 8px", fontFamily: "monospace", fontWeight: 800, color: "#1A3A5C" }}>{o.punteggio_tot?.toFixed(2)}</td>
                                 <td style={{ padding: "6px 8px", fontFamily: "monospace", fontWeight: 700, color: "#166534", whiteSpace: "nowrap" }}>{fmt(o.contributo_2026)}</td>
                               </tr>
                             ))}
                           </tbody>
-                          <tfoot>
-                            <tr style={{ background: "#F0F9F4" }}>
-                              <td colSpan={8} style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: "#166534" }}>Totale sottoinsieme</td>
-                              <td style={{ padding: "6px 8px", fontFamily: "monospace", fontWeight: 800, color: "#166534" }}>
-                                {fmt(sub.organismi?.reduce((s, o) => s + (o.contributo_2026 || 0), 0))}
-                              </td>
-                            </tr>
-                          </tfoot>
                         </table>
                       </div>
                     ))}
@@ -342,11 +318,10 @@ export default function ParserDecreto() {
           <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1C1C1C", marginBottom: 10 }}>Prossimo passo: INSERT in Supabase</div>
             <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.7 }}>
-              Il JSON scaricato contiene tutti i dati strutturati pronti per l'inserimento.<br />
-              Lo script di import leggerà questo file e farà INSERT nelle tabelle:
-              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px", fontFamily: "monospace" }}>decreti</code>
-              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px", fontFamily: "monospace" }}>organismi</code>
-              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px", fontFamily: "monospace" }}>assegnazioni</code>
+              Il JSON scaricato contiene tutti i dati strutturati pronti per l inserimento nelle tabelle:
+              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px" }}>decreti</code>
+              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px" }}>organismi</code>
+              <code style={{ background: "#F3F4F6", padding: "1px 6px", borderRadius: 3, margin: "0 3px" }}>assegnazioni</code>
             </div>
           </div>
         </>
