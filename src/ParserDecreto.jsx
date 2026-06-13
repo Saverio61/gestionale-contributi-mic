@@ -1,9 +1,5 @@
 import { useState, useCallback } from "react";
 
-// ── PARSER DECRETO MIC/FNSV ────────────────────────────────
-// Carica un file .txt/.md del decreto, lo manda a Claude API,
-// riceve JSON strutturato pronto per INSERT in Supabase.
-
 const PROMPT_SISTEMA = `Sei un parser specializzato per i decreti MIC/FNSV italiani (Fondo Nazionale Spettacolo dal Vivo).
 Estrai TUTTI i dati dalle tabelle del decreto e restituisci SOLO un oggetto JSON valido, senza testo aggiuntivo, senza backtick, senza markdown.
 
@@ -62,28 +58,25 @@ Regole di estrazione:
 - tutti i punteggi come numeri decimali (es. 35.00)
 - includi TUTTI gli organismi di TUTTE le tabelle, nessuno escluso`;
 
-// ── UTILITY ────────────────────────────────────────────────
 const fmt = (n) =>
   n != null
     ? new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n)
     : "—";
 
-const badge = (color, bg, text) => ({
+const badge = (color, bg) => ({
   display: "inline-block", padding: "2px 10px", borderRadius: 12,
   fontSize: 11, fontWeight: 700, color, background: bg,
 });
 
-// ── COMPONENTE PRINCIPALE ──────────────────────────────────
 export default function ParserDecreto() {
   const [testo, setTesto]         = useState("");
   const [nomeFile, setNomeFile]   = useState("");
-  const [stato, setStato]         = useState("idle"); // idle | caricamento | estratto | errore
+  const [stato, setStato]         = useState("idle");
   const [risultato, setRisultato] = useState(null);
   const [errore, setErrore]       = useState("");
-  const [tab, setTab]             = useState("anteprima"); // anteprima | json
+  const [tab, setTab]             = useState("anteprima");
   const [progress, setProgress]   = useState("");
 
-  // Caricamento file
   const onFile = useCallback((e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -95,20 +88,22 @@ export default function ParserDecreto() {
     reader.readAsText(file, "utf-8");
   }, []);
 
-  // Chiamata Claude API
   const estrai = async () => {
     if (!testo.trim()) return;
     setStato("caricamento");
     setErrore("");
-    setProgress("Invio decreto a Claude...");
+    setProgress("Preparazione testo decreto...");
 
     try {
-      // Tronca il testo se troppo lungo (Claude gestisce ~200k token ma per sicurezza)
-     
+      // Taglia il preambolo legale e invia solo la parte con le tabelle
+      const inizioTabelle = testo.indexOf("D E C R E T A");
+      const testoTabelle = inizioTabelle > 0 ? testo.slice(inizioTabelle) : testo;
+      const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000) : testoTabelle;
 
-      setProgress("Estrazione dati in corso (può richiedere 20-40 secondi)...");
+      setProgress("Invio a Claude (20-40 secondi)...");
 
-const response = await fetch("/.netlify/functions/claude-proxy", {        method: "POST",
+      const response = await fetch("/.netlify/functions/claude-proxy", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
@@ -133,7 +128,6 @@ const response = await fetch("/.netlify/functions/claude-proxy", {        method
 
       setProgress("Parsing JSON...");
 
-      // Pulizia robusta del JSON
       let json_pulito = testo_risposta.trim();
       json_pulito = json_pulito.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
 
@@ -148,7 +142,6 @@ const response = await fetch("/.netlify/functions/claude-proxy", {        method
     }
   };
 
-  // Scarica JSON
   const scaricaJSON = () => {
     if (!risultato) return;
     const blob = new Blob([JSON.stringify(risultato, null, 2)], { type: "application/json" });
@@ -160,12 +153,9 @@ const response = await fetch("/.netlify/functions/claude-proxy", {        method
     URL.revokeObjectURL(url);
   };
 
-  // Calcola totali
   const totali = risultato
     ? (() => {
-        const inizioTabelle = testo.indexOf("D E C R E T A");
-const testoTabelle = inizioTabelle > 0 ? testo.slice(inizioTabelle) : testo;
-const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000) : testoTabelle;
+        let org = 0, importo = 0;
         risultato.sezioni?.forEach((s) =>
           s.sottoinsiemi?.forEach((si) => {
             org += si.organismi?.length || 0;
@@ -176,10 +166,8 @@ const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000)
       })()
     : null;
 
-  // ── RENDER ─────────────────────────────────────────────
   return (
     <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", background: "#F7F4EE", minHeight: "100vh", padding: 24 }}>
-      {/* Header */}
       <div style={{ background: "#1A3A5C", color: "#fff", borderRadius: 8, padding: "16px 24px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ borderLeft: "4px solid #B8860B", paddingLeft: 16 }}>
           <div style={{ fontSize: 11, color: "#B8860B", fontFamily: "monospace", letterSpacing: 2, textTransform: "uppercase" }}>MIC / FNSV</div>
@@ -188,7 +176,6 @@ const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000)
         </div>
       </div>
 
-      {/* Upload */}
       <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: 24, marginBottom: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#1C1C1C", marginBottom: 12 }}>1. Carica il file del decreto</div>
         <label style={{
@@ -208,7 +195,6 @@ const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000)
           <input type="file" accept=".txt,.md,.text" onChange={onFile} style={{ display: "none" }} />
         </label>
 
-        {/* Oppure incolla testo */}
         <div style={{ marginTop: 16 }}>
           <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6 }}>
             Oppure incolla direttamente il testo del decreto:
@@ -247,10 +233,8 @@ const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000)
         )}
       </div>
 
-      {/* Risultato */}
       {risultato && (
         <>
-          {/* Riepilogo decreto */}
           <div style={{ background: "#1A3A5C", color: "#fff", borderRadius: 8, padding: "16px 24px", marginBottom: 16, borderLeft: "4px solid #B8860B" }}>
             <div style={{ fontFamily: "monospace", fontSize: 11, color: "#B8860B", letterSpacing: 1 }}>
               D.D.G. REP. N. {risultato.decreto?.numero_rep} · {risultato.decreto?.data}
@@ -265,7 +249,6 @@ const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000)
             </div>
           </div>
 
-          {/* Tab anteprima / JSON */}
           <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, overflow: "hidden", marginBottom: 20 }}>
             <div style={{ display: "flex", borderBottom: "1px solid #E5E7EB" }}>
               {["anteprima", "json"].map((t) => (
@@ -291,12 +274,11 @@ const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000)
               <div style={{ padding: 20, maxHeight: 600, overflowY: "auto" }}>
                 {risultato.sezioni?.map((sez, si) => (
                   <div key={si} style={{ marginBottom: 28 }}>
-                    {/* Header sezione */}
                     <div style={{ background: "#E8F0F8", borderLeft: "3px solid #1A3A5C", padding: "8px 14px", borderRadius: "0 6px 6px 0", marginBottom: 12 }}>
                       <div style={{ fontWeight: 700, color: "#1A3A5C", fontSize: 13 }}>
                         {sez.articolo_dm} — {sez.descrizione_settore}
                         {sez.prima_istanza_triennale && (
-                          <span style={{ ...badge("#166534", "#DCFCE7", ""), marginLeft: 8 }}>Prime istanze triennali</span>
+                          <span style={{ ...badge("#166534", "#DCFCE7"), marginLeft: 8 }}>Prime istanze triennali</span>
                         )}
                       </div>
                       <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>
@@ -354,7 +336,6 @@ const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000)
             )}
           </div>
 
-          {/* Istruzioni Supabase */}
           <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1C1C1C", marginBottom: 10 }}>Prossimo passo: INSERT in Supabase</div>
             <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.7 }}>
