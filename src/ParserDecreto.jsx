@@ -98,7 +98,7 @@ export default function ParserDecreto() {
       // Taglia il preambolo legale e invia solo la parte con le tabelle
       const inizioTabelle = testo.indexOf("D E C R E T A");
       const testoTabelle = inizioTabelle > 0 ? testo.slice(inizioTabelle) : testo;
-      const testoTroncato = testoTabelle.length > 80000 ? testoTabelle.slice(0, 80000) : testoTabelle;
+      const testoTroncato = testoTabelle.length > 40000 ? testoTabelle.slice(0, 40000) : testoTabelle;
 
       setProgress("Invio a Claude (20-40 secondi)...");
 
