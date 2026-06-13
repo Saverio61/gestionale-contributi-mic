@@ -47,6 +47,11 @@ async function chiamaClaude(prompt, testo) {
   const data = await response.json();
   let txt = data.content?.find((b) => b.type === "text")?.text || "";
   txt = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+  if (txt.startsWith("{") && txt.includes("}
+{")) {
+    txt = "[" + txt.replace(/\}\s*
+\s*\{/g, "},{") + "]";
+  }
   return JSON.parse(txt);
 }
 
