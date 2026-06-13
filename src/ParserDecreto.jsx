@@ -101,7 +101,7 @@ export default function ParserDecreto() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 8000,
+          max_tokens: 16000,
           system: PROMPT_SISTEMA,
           messages: [
             {
