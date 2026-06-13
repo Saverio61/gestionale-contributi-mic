@@ -3,28 +3,24 @@ import { useState, useCallback } from "react";
 const SUPABASE_URL = "https://rgbqpybaeojhrbqgxtui.supabase.co/functions/v1/swift-function";
 
 const PROMPT_CHUNK = `Sei un parser per decreti MIC/FNSV italiani.
-Estrai i dati dalle tabelle e restituisci SOLO JSON valido minificato senza spazi extra.
+Estrai i dati dalle tabelle e restituisci SOLO un array JSON valido minificato.
+Anche se c'e' una sola tabella restituisci sempre un array: [...]
 
-Per ogni tabella che trovi restituisci:
+Per ogni tabella restituisci un oggetto:
 {"articolo_dm":"string","descrizione_settore":"string","prima_istanza_triennale":boolean,"stanziamento_totale_art":number,"risorse_assegnate":number,"numero_sottoinsieme":number,"organismi":[{"posizione":number,"denominazione":"string","comune":"string","sigla_provincia":"string","punteggio_vd":number,"punteggio_qa":number,"punteggio_qi":number,"punteggio_da":number,"punteggio_tot":number,"contributo_2026":number}]}
 
 Regole:
-- articolo_dm: es "Art. 42"
-- prima_istanza_triennale: true se la tabella contiene "Prime istanze triennali"
+- prima_istanza_triennale: true se contiene "Prime istanze triennali"
 - stanziamento_totale_art: riga "Stanziamento totale art."
 - risorse_assegnate: riga "Risorse assegnate"
-- numero_sottoinsieme: 1 se primo, 2 se secondo, ecc.
+- numero_sottoinsieme: 1 primo, 2 secondo, ecc.
 - da "Torino (TO)" estrai comune:"Torino" sigla_provincia:"TO"
 - importi come numeri es 554419.00
 - punteggi come decimali es 35.00
-Se ci sono piu tabelle nel testo restituisci un array JSON: [...]`;
+IMPORTANTE: restituisci SEMPRE e SOLO un array JSON, mai oggetti singoli`;
 
-const PROMPT_DECRETO = `Estrai solo i metadati del decreto (non le tabelle) e restituisci SOLO JSON:
-{"numero_rep":"string","data":"YYYY-MM-DD","anno_finanziario":number,"ambito":"string","stanziamento_totale":number}
-- numero_rep: solo il numero es "573"
-- data: es "2026-06-11"
-- ambito: es "Multidisciplinare"
-- stanziamento_totale: totale FNSV in euro`;
+const PROMPT_DECRETO = `Estrai solo i metadati del decreto e restituisci SOLO questo JSON:
+{"numero_rep":"string","data":"YYYY-MM-DD","anno_finanziario":number,"ambito":"string","stanziamento_totale":number}`;
 
 const fmt = (n) =>
   n != null
@@ -38,42 +34,30 @@ async function chiamaClaude(prompt, testo) {
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 4000,
-      messages: [
-        { role: "user", content: prompt + "\n\n" + testo }
-      ],
+      messages: [{ role: "user", content: prompt + "\n\n" + testo }],
     }),
   });
   if (!response.ok) throw new Error("HTTP " + response.status);
   const data = await response.json();
   let txt = data.content?.find((b) => b.type === "text")?.text || "";
   txt = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
-  if (txt.startsWith("{") && txt.includes("}
-{")) {
-    txt = "[" + txt.replace(/\}\s*
-\s*\{/g, "},{") + "]";
-  }
   return JSON.parse(txt);
 }
 
 function dividiInChunk(testo) {
-  // Trova tutti gli articoli nel testo
-  const pattern = /(Art\.\s*\d+[^\n]*\n)/g;
-  const posizioni = [];
-  let match;
-  while ((match = pattern.exec(testo)) !== null) {
-    posizioni.push(match.index);
-  }
-  
-  if (posizioni.length === 0) return [testo];
-  
+  const lines = testo.split("\n");
   const chunks = [];
-  for (let i = 0; i < posizioni.length; i++) {
-    const inizio = posizioni[i];
-    const fine = i + 1 < posizioni.length ? posizioni[i + 1] : testo.length;
-    const chunk = testo.slice(inizio, fine);
-    if (chunk.trim().length > 50) chunks.push(chunk);
+  let chunk = [];
+  
+  for (const line of lines) {
+    if (line.match(/^Art\.\s*\d+/) && chunk.length > 5) {
+      chunks.push(chunk.join("\n"));
+      chunk = [];
+    }
+    chunk.push(line);
   }
-  return chunks;
+  if (chunk.length > 0) chunks.push(chunk.join("\n"));
+  return chunks.filter(c => c.trim().length > 50);
 }
 
 export default function ParserDecreto() {
@@ -102,26 +86,22 @@ export default function ParserDecreto() {
     setErrore("");
 
     try {
-      // Trova inizio tabelle
       const inizioDecreta = testo.indexOf("D E C R E T A");
       const testoTabelle = inizioDecreta > 0 ? testo.slice(inizioDecreta) : testo;
-      
-      // 1. Estrai metadati decreto
-      setProgress("Estrazione metadati decreto (1/2)...");
+
+      setProgress("Estrazione metadati decreto...");
       const decretoMeta = await chiamaClaude(PROMPT_DECRETO, testo.slice(0, 3000));
-      
-      // 2. Dividi in chunk per articolo
+
       const chunks = dividiInChunk(testoTabelle);
-      setProgress(`Elaborazione ${chunks.length} sezioni...`);
-      
       const sezioni = [];
+
       for (let i = 0; i < chunks.length; i++) {
-        setProgress(`Elaborazione sezione ${i + 1} di ${chunks.length}...`);
+        setProgress("Elaborazione sezione " + (i + 1) + " di " + chunks.length + "...");
         try {
           const risultatoChunk = await chiamaClaude(PROMPT_CHUNK, chunks[i]);
           const lista = Array.isArray(risultatoChunk) ? risultatoChunk : [risultatoChunk];
           for (const s of lista) {
-            if (s.organismi && s.organismi.length > 0) {
+            if (s && s.organismi && s.organismi.length > 0) {
               sezioni.push({
                 articolo_dm: s.articolo_dm,
                 descrizione_settore: s.descrizione_settore,
@@ -136,12 +116,11 @@ export default function ParserDecreto() {
             }
           }
         } catch (e) {
-          console.warn("Chunk " + i + " saltato:", e.message);
+          console.warn("Chunk " + (i + 1) + " saltato:", e.message);
         }
       }
 
-      const parsed = { decreto: decretoMeta, sezioni };
-      setRisultato(parsed);
+      setRisultato({ decreto: decretoMeta, sezioni });
       setStato("estratto");
       setProgress("");
     } catch (err) {
