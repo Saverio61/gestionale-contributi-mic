@@ -217,7 +217,7 @@ async function importaInSupabase(risultato, setImportProgress, setImportStato) {
               contributo_assegnato: contributo,
               stanziamento_totale_settore: sez.stanziamento_totale_art || 0,
               posizione_graduatoria: org.posizione,
-            }, { onConflict: "organismo_id,decreto_id,settore_id", ignoreDuplicates: false });
+            }, { onConflict: "organismo_id,decreto_id,settore_id", ignoreDuplicates: true });
 
             importati++;
           } catch (e) {
@@ -250,6 +250,7 @@ export default function ParserDecreto() {
   const [ambitoManuale, setAmbitoManuale] = useState("");
   const [numeroRepManuale, setNumeroRepManuale] = useState("");
   const [annoManuale, setAnnoManuale] = useState("");
+  const [dataManuale, setDataManuale] = useState("");
 
   const onFile = useCallback((e) => {
     const file = e.target.files[0];
@@ -261,6 +262,7 @@ export default function ParserDecreto() {
     setAmbitoManuale("");
     setNumeroRepManuale("");
     setAnnoManuale("");
+    setDataManuale("");
     const reader = new FileReader();
     reader.onload = (ev) => setTesto(ev.target.result);
     reader.readAsText(file, "utf-8");
@@ -327,6 +329,7 @@ export default function ParserDecreto() {
       ...(ambitoManuale ? { ambito: ambitoManuale } : {}),
       ...(numeroRepManuale ? { numero_rep: numeroRepManuale } : {}),
       ...(annoManuale ? { anno_finanziario: parseInt(annoManuale) } : {}),
+      ...(dataManuale ? { data: dataManuale } : {}),
     };
     await importaInSupabase(risultato, setImportProgress, setImportStato);
     setStato("estratto");
@@ -386,10 +389,13 @@ export default function ParserDecreto() {
             <>
               <input value={numeroRepManuale} onChange={e => setNumeroRepManuale(e.target.value)}
                 placeholder={`N. Rep (es. ${risultato?.decreto?.numero_rep || "770"})`}
-                style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, width: 140, background: C.bianco }} />
+                style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, width: 130, background: C.bianco }} />
               <input value={annoManuale} onChange={e => setAnnoManuale(e.target.value)}
                 placeholder={`Anno (es. ${risultato?.decreto?.anno_finanziario || "2025"})`}
-                style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, width: 110, background: C.bianco }} />
+                style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, width: 100, background: C.bianco }} />
+              <input value={dataManuale} onChange={e => setDataManuale(e.target.value)}
+                placeholder="Data (YYYY-MM-DD)"
+                style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, width: 140, background: C.bianco }} />
               <select value={ambitoManuale} onChange={e => setAmbitoManuale(e.target.value)}
                 style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, background: C.bianco, color: C.testo }}>
                 <option value="">Ambito auto-rilevato</option>

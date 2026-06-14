@@ -352,7 +352,7 @@ function TabellaAssegnazioni({ dati, onSelectRiga, mostraPunteggi = false, mostr
                   <td style={{ padding: "9px 12px" }}>
                     <div style={{ color: T.muted, fontSize: 10, ...mono, whiteSpace: "nowrap", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>{d.articolo_dm}</div>
                     {d.descrizione_settore && d.descrizione_settore !== d.articolo_dm && (
-                      <div style={{ fontSize: 9, color: T.mutedChi, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.descrizione_settore}</div>
+                      <div style={{ fontSize: 10, color: T.muted, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.descrizione_settore}</div>
                     )}
                   </td>
                   {mostraSottoinsieme && (
@@ -388,7 +388,104 @@ function KpiCard({ label, value, sub, color }) {
   );
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────
+// ── FUNZIONI REPORT ──────────────────────────────────────────
+function generaCSV(dati) {
+  const headers = ["Anno","Organismo","Comune","Provincia","Regione","Ambito","Articolo","Settore","Sottoinsieme","VD","QA","QI","DA","TOT","Contributo"];
+  const rows = dati.map(d => [
+    d.anno, `"${d.denominazione}"`, `"${d.comune||''}"`, d.sigla_provincia||'', d.regione||'',
+    d.ambito, d.articolo_dm, `"${d.descrizione_settore||''}"`,
+    d.numero_sottoinsieme||1,
+    d.punteggio_vd, d.punteggio_qa, d.punteggio_qi, d.punteggio_da, d.punteggio_tot,
+    d.contributo_assegnato
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(";")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url;
+  a.download = `assegnazioni_puglia_basilicata_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function generaReportPDF(dati, regione, anno, ambito) {
+  const fmt2 = (n) => n != null ? new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n) : "--";
+  const totale = dati.reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
+  const totPU = dati.filter(d => d.regione === "Puglia").reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
+  const totBA = dati.filter(d => d.regione === "Basilicata").reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
+  
+  const titolo = `Report FNSV — ${regione === "tutti" ? "Puglia e Basilicata" : regione} — ${anno === "tutti" ? "Tutti gli anni" : anno} — ${ambito === "tutti" ? "Tutti gli ambiti" : ambito}`;
+  
+  const righe = dati.map(d => `
+    <tr style="border-bottom:1px solid #E5E7EB; background:${d.regione==="Puglia"?"#FFFCF0":"#F8FFF8"}">
+      <td style="padding:6px 8px;font-weight:700;color:#003D8F;font-family:monospace">${d.anno}</td>
+      <td style="padding:6px 8px;font-weight:600">${d.denominazione}</td>
+      <td style="padding:6px 8px;color:#6B7280;font-size:11px">${d.comune||"--"} ${d.sigla_provincia ? "("+d.sigla_provincia+")" : ""}</td>
+      <td style="padding:6px 8px"><span style="background:${d.regione==="Puglia"?"#FDF8E1":"#E8F5EE"};color:${d.regione==="Puglia"?"#C49A00":"#1A6B3C"};padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700">${d.regione||"--"}</span></td>
+      <td style="padding:6px 8px;color:#6B7280;font-size:11px">${d.ambito}</td>
+      <td style="padding:6px 8px;font-family:monospace;font-size:11px">${d.articolo_dm}</td>
+      <td style="padding:6px 8px;font-family:monospace;text-align:right">${d.punteggio_vd?.toFixed(2)||"--"}</td>
+      <td style="padding:6px 8px;font-family:monospace;text-align:right">${d.punteggio_qa?.toFixed(2)||"--"}</td>
+      <td style="padding:6px 8px;font-family:monospace;text-align:right">${d.punteggio_qi?.toFixed(2)||"--"}</td>
+      <td style="padding:6px 8px;font-family:monospace;text-align:right">${d.punteggio_da?.toFixed(2)||"--"}</td>
+      <td style="padding:6px 8px;font-family:monospace;font-weight:800;color:#003D8F;text-align:right">${d.punteggio_tot?.toFixed(2)||"--"}</td>
+      <td style="padding:6px 8px;font-family:monospace;font-weight:700;color:#1A6B3C;text-align:right">${fmt2(d.contributo_assegnato)}</td>
+    </tr>`).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>${titolo}</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; color: #1F2937; font-size: 12px; }
+  @media print { body { padding: 10px; } .no-print { display: none; } }
+  h1 { font-size: 18px; color: #003D8F; margin: 0 0 4px; }
+  .sub { color: #6B7280; font-size: 12px; margin-bottom: 16px; }
+  .kpi { display: flex; gap: 16px; margin-bottom: 20px; }
+  .kpi-card { background: #F5F6F8; border: 1px solid #D9DCE3; border-top: 3px solid #003D8F; border-radius: 6px; padding: 12px 16px; flex: 1; }
+  .kpi-label { font-size: 10px; color: #6B7280; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+  .kpi-value { font-size: 20px; font-weight: 900; font-family: monospace; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  thead tr { background: #0A1628; color: white; }
+  th { padding: 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  th.right { text-align: right; }
+  .footer { margin-top: 20px; font-size: 10px; color: #9CA3AF; border-top: 1px solid #E5E7EB; padding-top: 10px; }
+  button.print-btn { background: #003D8F; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 700; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">🖨 Stampa / Salva PDF</button>
+<div style="background:#0A1628;color:white;padding:14px 18px;margin-bottom:16px;border-radius:6px;border-left:4px solid #C49A00">
+  <div style="font-size:9px;color:#C49A00;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">MIC / FNSV — AGIS Puglia e Basilicata</div>
+  <h1 style="color:white;margin:0 0 4px">${titolo}</h1>
+  <div style="color:rgba(255,255,255,0.55);font-size:11px">Generato il ${new Date().toLocaleDateString("it-IT")} · ${dati.length} organismi</div>
+</div>
+<div class="kpi">
+  <div class="kpi-card"><div class="kpi-label">Organimi totali</div><div class="kpi-value">${dati.length}</div></div>
+  <div class="kpi-card" style="border-top-color:#C49A00"><div class="kpi-label">Puglia</div><div class="kpi-value" style="color:#C49A00">${fmt2(totPU)}</div></div>
+  <div class="kpi-card" style="border-top-color:#1A6B3C"><div class="kpi-label">Basilicata</div><div class="kpi-value" style="color:#1A6B3C">${fmt2(totBA)}</div></div>
+  <div class="kpi-card"><div class="kpi-label">Totale</div><div class="kpi-value">${fmt2(totale)}</div></div>
+</div>
+<table>
+  <thead><tr>
+    <th>Anno</th><th>Organismo</th><th>Sede</th><th>Regione</th><th>Ambito</th><th>Art.</th>
+    <th class="right">VD</th><th class="right">QA</th><th class="right">QI</th><th class="right">DA</th>
+    <th class="right">TOT</th><th class="right">Contributo</th>
+  </tr></thead>
+  <tbody>${righe}</tbody>
+  <tfoot><tr style="background:#F5F6F8;border-top:2px solid #D9DCE3">
+    <td colspan="11" style="padding:8px;font-weight:700;color:#1F2937">TOTALE (${dati.length} organismi)</td>
+    <td style="padding:8px;font-family:monospace;font-weight:900;color:#1A6B3C;text-align:right">${fmt2(totale)}</td>
+  </tr></tfoot>
+</table>
+<div class="footer">AGIS Puglia e Basilicata · Elaborazione su dati MIC / DG Spettacolo · Fondo Nazionale per lo Spettacolo dal Vivo</div>
+</body></html>`;
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
 function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -520,6 +617,7 @@ function PugliaBasilicata() {
   const [filtroAnno, setFiltroAnno] = useState("tutti");
   const [filtroRegione, setFiltroRegione] = useState("tutti");
   const [filtroAmbito, setFiltroAmbito] = useState("tutti");
+  const [cerca, setCerca] = useState("");
   const [selected, setSelected] = useState(null);
 
   const anni = ["tutti", ...new Set(dati.map(d => d.anno))];
@@ -527,7 +625,9 @@ function PugliaBasilicata() {
   const filtrati = dati.filter(d =>
     (filtroAnno === "tutti" || d.anno === parseInt(filtroAnno)) &&
     (filtroRegione === "tutti" || d.regione === filtroRegione) &&
-    (filtroAmbito === "tutti" || d.ambito === filtroAmbito)
+    (filtroAmbito === "tutti" || d.ambito === filtroAmbito) &&
+    (!cerca || d.denominazione?.toLowerCase().includes(cerca.toLowerCase()) ||
+               d.comune?.toLowerCase().includes(cerca.toLowerCase()))
   );
   const totPU = filtrati.filter(d => d.regione === "Puglia").reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
   const totBA = filtrati.filter(d => d.regione === "Basilicata").reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
@@ -549,6 +649,7 @@ function PugliaBasilicata() {
         <KpiCard label="Totale contributi" value={fmt(totPU + totBA)} color={T.marino} />
       </div>
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <input value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca organismo o comune…" style={{ ...sel, width: 220 }} />
         <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)} style={sel}>{anni.map(a => <option key={a}>{a}</option>)}</select>
         <select value={filtroRegione} onChange={e => setFiltroRegione(e.target.value)} style={sel}>
           <option>tutti</option><option>Puglia</option><option>Basilicata</option>
@@ -556,6 +657,18 @@ function PugliaBasilicata() {
         <select value={filtroAmbito} onChange={e => setFiltroAmbito(e.target.value)} style={sel}>{ambiti.map(a => <option key={a}>{a}</option>)}</select>
       </div>
       <TabellaAssegnazioni dati={filtrati} onSelectRiga={setSelected} mostraPunteggi={true} mostraSottoinsieme={true} />
+      
+      {/* Pulsante Report PDF */}
+      <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
+        <button onClick={() => generaReportPDF(filtrati, filtroRegione, filtroAnno, filtroAmbito)}
+          style={{ padding: "10px 22px", borderRadius: 5, border: "none", background: T.marino, color: T.bianco, fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+          📄 Genera Report PDF
+        </button>
+        <button onClick={() => generaCSV(filtrati)}
+          style={{ padding: "10px 22px", borderRadius: 5, border: `1px solid ${T.bordo}`, background: T.bianco, color: T.testo, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+          📊 Esporta CSV
+        </button>
+      </div>
     </div>
   );
 }
@@ -564,27 +677,60 @@ function PugliaBasilicata() {
 function Decreti() {
   const [dati, setDati] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [decretoSelezionato, setDecretoSelezionato] = useState(null);
+  const [assegnazioni, setAssegnazioni] = useState([]);
+  const [loadingAss, setLoadingAss] = useState(false);
+  const [selected, setSelected] = useState(null);
+
   useEffect(() => {
     supabase.schema("contributi_mic").from("decreti").select("*, ambito:ambito_id(nome)").order("data", { ascending: false })
       .then(({ data }) => { setDati(data || []); setLoading(false); });
   }, []);
+
+  async function apriDecreto(d) {
+    if (decretoSelezionato?.id === d.id) { setDecretoSelezionato(null); setAssegnazioni([]); return; }
+    setDecretoSelezionato(d);
+    setLoadingAss(true);
+    const { data } = await supabase.schema("contributi_mic").from("v_assegnazioni")
+      .select("*").eq("anno", d.anno_finanziario)
+      .order("punteggio_tot", { ascending: false });
+    // Filtra per ambito
+    const filtered = (data || []).filter(a => a.ambito_codice === d.ambito?.codice || true);
+    setAssegnazioni(data || []);
+    setLoadingAss(false);
+  }
+
   if (loading) return <div style={{ padding: 48, color: T.muted }}>Caricamento…</div>;
+
   return (
     <div style={{ padding: "28px 36px" }}>
+      {selected && <ModalOrganismo riga={selected} onClose={() => setSelected(null)} />}
       <h1 style={{ fontSize: 20, fontWeight: 800, color: T.testo, margin: "0 0 20px" }}>Decreti importati</h1>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {dati.map(d => (
-          <div key={d.id} style={{ background: T.bianco, border: `1px solid ${T.bordo}`, borderLeft: `3px solid ${T.oro}`, borderRadius: 6, padding: "15px 20px", display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ background: T.inchiostro, color: T.bianco, borderRadius: 4, padding: "8px 14px", textAlign: "center", flexShrink: 0, ...mono }}>
-              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: 1 }}>D.D.G. REP.</div>
-              <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1 }}>{d.numero_rep}</div>
-              <div style={{ fontSize: 9, color: T.oro, marginTop: 2 }}>{d.anno_finanziario}</div>
+          <div key={d.id}>
+            <div onClick={() => apriDecreto(d)} style={{ background: T.bianco, border: `1px solid ${decretoSelezionato?.id === d.id ? T.marino : T.bordo}`, borderLeft: `3px solid ${T.oro}`, borderRadius: 6, padding: "15px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer" }}>
+              <div style={{ background: T.inchiostro, color: T.bianco, borderRadius: 4, padding: "8px 14px", textAlign: "center", flexShrink: 0, ...mono }}>
+                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: 1 }}>D.D.G. REP.</div>
+                <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1 }}>{d.numero_rep}</div>
+                <div style={{ fontSize: 9, color: T.oro, marginTop: 2 }}>{d.anno_finanziario}</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: T.testo }}>{d.ambito?.nome}</div>
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>{d.ente_erogante} · {d.data}</div>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: T.verde, ...mono }}>{fmt(d.stanziamento_totale)}</div>
+              <div style={{ fontSize: 18, color: T.muted }}>{decretoSelezionato?.id === d.id ? "▲" : "▼"}</div>
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: T.testo }}>{d.ambito?.nome}</div>
-              <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>{d.ente_erogante} · {d.data}</div>
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: T.verde, ...mono }}>{fmt(d.stanziamento_totale)}</div>
+            {decretoSelezionato?.id === d.id && (
+              <div style={{ border: `1px solid ${T.bordo}`, borderTop: "none", borderRadius: "0 0 6px 6px", background: T.sfondo }}>
+                {loadingAss ? (
+                  <div style={{ padding: 20, color: T.muted, fontStyle: "italic" }}>Caricamento assegnazioni…</div>
+                ) : (
+                  <TabellaAssegnazioni dati={assegnazioni} onSelectRiga={setSelected} mostraSottoinsieme={true} />
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
