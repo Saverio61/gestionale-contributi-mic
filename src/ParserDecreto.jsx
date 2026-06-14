@@ -235,6 +235,7 @@ export default function ParserDecreto() {
   const [progress, setProgress] = useState("");
   const [importProgress, setImportProgress] = useState("");
   const [importStato, setImportStato] = useState(null);
+  const [ambitoManuale, setAmbitoManuale] = useState("");
 
   const onFile = useCallback((e) => {
     const file = e.target.files[0];
@@ -243,6 +244,7 @@ export default function ParserDecreto() {
     setStato("idle");
     setRisultato(null);
     setImportStato(null);
+    setAmbitoManuale("");
     const reader = new FileReader();
     reader.onload = (ev) => setTesto(ev.target.result);
     reader.readAsText(file, "utf-8");
@@ -303,6 +305,13 @@ export default function ParserDecreto() {
     if (!risultato) return;
     setStato("importazione");
     setImportStato(null);
+    // Se ambito non estratto usa quello manuale
+    if (ambitoManuale && !risultato.decreto?.ambito) {
+      risultato.decreto = { ...risultato.decreto, ambito: ambitoManuale };
+    }
+    if (ambitoManuale) {
+      risultato.decreto = { ...risultato.decreto, ambito: ambitoManuale };
+    }
     await importaInSupabase(risultato, setImportProgress, setImportStato);
     setStato("estratto");
   };
@@ -358,10 +367,22 @@ export default function ParserDecreto() {
           </button>
 
           {risultato && stato !== "importazione" && (
-            <button onClick={importa}
-              style={{ padding: "10px 26px", borderRadius: 6, border: "none", background: C.verde, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-              ⬆️ Importa in Supabase
-            </button>
+            <>
+              <select value={ambitoManuale} onChange={e => setAmbitoManuale(e.target.value)}
+                style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, background: C.bianco, color: C.testo }}>
+                <option value="">Ambito auto-rilevato</option>
+                <option value="DANZA">Danza</option>
+                <option value="MUSICA">Musica</option>
+                <option value="TEATRO">Teatro</option>
+                <option value="CIRCO">Circo e Spettacolo Viaggiante</option>
+                <option value="MULTIDISCIPLINARE">Multidisciplinare</option>
+                <option value="PROMOZIONE">Promozione</option>
+              </select>
+              <button onClick={importa}
+                style={{ padding: "10px 26px", borderRadius: 6, border: "none", background: C.verde, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                ⬆️ Importa in Supabase
+              </button>
+            </>
           )}
 
           {stato === "importazione" && (
