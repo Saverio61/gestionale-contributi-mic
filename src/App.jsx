@@ -213,6 +213,9 @@ function ModalOrganismo({ riga, onClose }) {
                 <span style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", padding: "2px 10px", borderRadius: 3, fontSize: 10, ...mono }}>{riga.articolo_dm}</span>
                 {riga.prima_istanza_triennale && <span style={{ background: T.oroChi, color: T.oro, padding: "2px 10px", borderRadius: 3, fontSize: 10, fontWeight: 700 }}>1ª istanza triennale</span>}
               </div>
+              {riga.descrizione_settore && riga.descrizione_settore !== riga.articolo_dm && (
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>{riga.descrizione_settore}</div>
+              )}
               <div style={{ fontSize: 16, fontWeight: 700, color: T.bianco, lineHeight: 1.3 }}>{riga.denominazione}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
                 <span style={{ fontSize: 12, color: sedeOk ? "rgba(255,255,255,0.55)" : T.oro }}>
@@ -270,7 +273,10 @@ function ModalOrganismo({ riga, onClose }) {
                       {storico.map((s, i) => (
                         <tr key={i} style={{ borderBottom: `1px solid ${T.bordo}`, background: s.anno === riga.anno ? T.oroChi : T.bianco }}>
                           <td style={{ padding: "9px 10px", fontWeight: 800, color: T.marino, ...mono }}>{s.anno}</td>
-                          <td style={{ padding: "9px 10px", color: T.muted, fontSize: 11 }}>{s.articolo_dm}</td>
+                          <td style={{ padding: "9px 10px", color: T.muted, fontSize: 11 }}>
+                            <div>{s.articolo_dm}</div>
+                            {s.descrizione_settore && s.descrizione_settore !== s.articolo_dm && <div style={{ fontSize: 10, color: T.mutedChi }}>{s.descrizione_settore?.substring(0,40)}</div>}
+                          </td>
                           {[s.punteggio_vd, s.punteggio_qa, s.punteggio_qi, s.punteggio_da].map((v, vi) => (
                             <td key={vi} style={{ padding: "9px 10px", ...mono, color: T.testo, fontSize: 11 }}>{v?.toFixed(2)}</td>
                           ))}
