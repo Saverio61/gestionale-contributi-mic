@@ -44,7 +44,8 @@ try {
   return JSON.parse(txt);
 } catch(e) {
   // Prova a unire oggetti JSON multipli in un array
-  const fixed = "[" + txt.replace(/\}\s*\{/g, "},{") + "]";
+const pulito = txt.replace(/\}\s*[\r\n]+\s*\{/g, "},{").replace(/\}\s*\{/g, "},{");
+const fixed = "[" + pulito + "]";
   return JSON.parse(fixed);
 }}
 
