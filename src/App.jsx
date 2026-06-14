@@ -514,7 +514,7 @@ function Assegnazioni() {
       </div>
       <Filtri cerca={cerca} setCerca={setCerca} filtroAnno={filtroAnno} setFiltroAnno={setFiltroAnno}
         filtroAmbito={filtroAmbito} setFiltroAmbito={setFiltroAmbito} anni={anni} ambiti={ambiti} />
-      <TabellaAssegnazioni dati={filtrati.slice(0, 300)} onSelectRiga={setSelected} />
+      <TabellaAssegnazioni dati={filtrati.slice(0, 600)} onSelectRiga={setSelected} />
       {filtrati.length > 300 && <div style={{ padding: "10px", fontSize: 12, color: C.grigioMed, textAlign: "center", marginTop: 8 }}>Mostrati 300 di {filtrati.length} — usa i filtri per restringere</div>}
     </div>
   );
