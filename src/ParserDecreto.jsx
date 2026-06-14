@@ -39,7 +39,6 @@ async function chiamaClaude(prompt, testo) {
   if (!response.ok) throw new Error("HTTP " + response.status);
   const data = await response.json();
   let txt = data.content?.find((b) => b.type === "text")?.text || "";
-  console.log("RISPOSTA CLAUDE:", txt.slice(0, 300));
   txt = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
 
   // Estrai tutti gli oggetti JSON validi dal testo
@@ -82,21 +81,27 @@ async function importaInSupabase(risultato, setImportProgress, setImportStato) {
   try {
     setImportProgress("Verifica ambito...");
 
-    // 1. Trova ambito_id
-    const { data: ambitoData, error: ambitoErr } = await supabase
-      .schema("contributi_mic").from("ambiti")
-      .select("id").ilike("codice", decreto.ambito).limit(1);
-
-    if (ambitoErr || !ambitoData?.length) {
-      // Prova con il nome
-      const { data: ambitoData2 } = await supabase
-        .schema("contributi_mic").from("ambiti")
-        .select("id").ilike("nome", `%${decreto.ambito}%`).limit(1);
-      if (!ambitoData2?.length) throw new Error(`Ambito "${decreto.ambito}" non trovato`);
+    // 1. Trova ambito_id — mappa nomi estesi ai codici
+    const mappaAmbiti = {
+      "musica": "MUSICA", "danza": "DANZA", "teatro": "TEATRO",
+      "circo": "CIRCO", "multidisciplinare": "MULTIDISCIPLINARE",
+      "promozione": "PROMOZIONE", "circo e spettacolo viaggiante": "CIRCO",
+      "spettacolo viaggiante": "CIRCO",
+    };
+    const ambitoKey = (decreto.ambito || "").toLowerCase();
+    let ambitoCodice = mappaAmbiti[ambitoKey];
+    if (!ambitoCodice) {
+      // Cerca corrispondenza parziale
+      for (const [k, v] of Object.entries(mappaAmbiti)) {
+        if (ambitoKey.includes(k) || k.includes(ambitoKey)) { ambitoCodice = v; break; }
+      }
     }
+    if (!ambitoCodice) throw new Error(`Ambito "${decreto.ambito}" non riconosciuto. Valori validi: MUSICA, DANZA, TEATRO, CIRCO, MULTIDISCIPLINARE`);
 
-    const ambito_id = (ambitoData?.[0] || (await supabase.schema("contributi_mic").from("ambiti").select("id").ilike("nome", `%${decreto.ambito}%`).limit(1)).data?.[0])?.id;
-    if (!ambito_id) throw new Error(`Ambito "${decreto.ambito}" non trovato in database`);
+    const { data: ambitoData } = await supabase.schema("contributi_mic").from("ambiti")
+      .select("id").eq("codice", ambitoCodice).single();
+    const ambito_id = ambitoData?.id;
+    if (!ambito_id) throw new Error(`Ambito "${ambitoCodice}" non trovato in database`);
 
     // 2. Insert decreto (ON CONFLICT DO NOTHING)
     setImportProgress("Inserimento decreto...");
