@@ -39,6 +39,7 @@ async function chiamaClaude(prompt, testo) {
   if (!response.ok) throw new Error("HTTP " + response.status);
   const data = await response.json();
   let txt = data.content?.find((b) => b.type === "text")?.text || "";
+  console.log("RISPOSTA CLAUDE:", txt.slice(0, 300));
   txt = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
 
   // Estrai tutti gli oggetti JSON validi dal testo
