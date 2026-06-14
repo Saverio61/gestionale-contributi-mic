@@ -58,6 +58,36 @@ async function chiamaClaude(prompt, testo) {
   return oggetti.length === 1 ? oggetti[0] : oggetti;
 }
 
+function pulisciTesto(testo) {
+  // Rimuovi intestazioni ripetute del MIC
+  return testo
+    .replace(/Ministero della cultura[\s\S]{0,300}?PEO:[^
+]+
+/g, "")
+    .replace(/DIPARTIMENTO PER LE ATTIVITÀ CULTURALI
+/g, "")
+    .replace(/DIREZIONE GENERALE SPETTACOLO
+/g, "")
+    .replace(/Piazza Santa Croce[^
+]+
+/g, "")
+    .replace(/\+39[^
+]+
+/g, "")
+    .replace(/PEC:[^
+]+
+/g, "")
+    .replace(/PEO:[^
+]+
+/g, "")
+    .replace(/pag\. \d+ di \d+
+/g, "")
+    .replace(/
+{3,}/g, "
+
+");
+}
+
 function dividiInChunk(testo) {
   const lines = testo.split("\n");
   const chunks = [];
@@ -281,7 +311,8 @@ export default function ParserDecreto() {
       setProgress("Estrazione metadati decreto...");
       const decretoMeta = await chiamaClaude(PROMPT_DECRETO, testo.slice(0, 3000));
 
-      const chunks = dividiInChunk(testoTabelle);
+      const testoTabellePulito = pulisciTesto(testoTabelle);
+      const chunks = dividiInChunk(testoTabellePulito);
       const sezioni = [];
 
       for (let i = 0; i < chunks.length; i++) {
