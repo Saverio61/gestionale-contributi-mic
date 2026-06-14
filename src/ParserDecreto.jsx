@@ -40,8 +40,13 @@ async function chiamaClaude(prompt, testo) {
   const data = await response.json();
   let txt = data.content?.find((b) => b.type === "text")?.text || "";
   txt = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+try {
   return JSON.parse(txt);
-}
+} catch(e) {
+  // Prova a unire oggetti JSON multipli in un array
+  const fixed = "[" + txt.replace(/\}\s*\{/g, "},{") + "]";
+  return JSON.parse(fixed);
+}}
 
 function dividiInChunk(testo) {
   const lines = testo.split("\n");
