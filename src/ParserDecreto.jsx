@@ -241,6 +241,8 @@ export default function ParserDecreto() {
   const [importProgress, setImportProgress] = useState("");
   const [importStato, setImportStato] = useState(null);
   const [ambitoManuale, setAmbitoManuale] = useState("");
+  const [numeroRepManuale, setNumeroRepManuale] = useState("");
+  const [annoManuale, setAnnoManuale] = useState("");
 
   const onFile = useCallback((e) => {
     const file = e.target.files[0];
@@ -250,6 +252,8 @@ export default function ParserDecreto() {
     setRisultato(null);
     setImportStato(null);
     setAmbitoManuale("");
+    setNumeroRepManuale("");
+    setAnnoManuale("");
     const reader = new FileReader();
     reader.onload = (ev) => setTesto(ev.target.result);
     reader.readAsText(file, "utf-8");
@@ -310,13 +314,13 @@ export default function ParserDecreto() {
     if (!risultato) return;
     setStato("importazione");
     setImportStato(null);
-    // Se ambito non estratto usa quello manuale
-    if (ambitoManuale && !risultato.decreto?.ambito) {
-      risultato.decreto = { ...risultato.decreto, ambito: ambitoManuale };
-    }
-    if (ambitoManuale) {
-      risultato.decreto = { ...risultato.decreto, ambito: ambitoManuale };
-    }
+    // Applica valori manuali
+    risultato.decreto = {
+      ...risultato.decreto,
+      ...(ambitoManuale ? { ambito: ambitoManuale } : {}),
+      ...(numeroRepManuale ? { numero_rep: numeroRepManuale } : {}),
+      ...(annoManuale ? { anno_finanziario: parseInt(annoManuale) } : {}),
+    };
     await importaInSupabase(risultato, setImportProgress, setImportStato);
     setStato("estratto");
   };
@@ -373,6 +377,12 @@ export default function ParserDecreto() {
 
           {risultato && stato !== "importazione" && (
             <>
+              <input value={numeroRepManuale} onChange={e => setNumeroRepManuale(e.target.value)}
+                placeholder={`N. Rep (es. ${risultato?.decreto?.numero_rep || "770"})`}
+                style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, width: 140, background: C.bianco }} />
+              <input value={annoManuale} onChange={e => setAnnoManuale(e.target.value)}
+                placeholder={`Anno (es. ${risultato?.decreto?.anno_finanziario || "2025"})`}
+                style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, width: 110, background: C.bianco }} />
               <select value={ambitoManuale} onChange={e => setAmbitoManuale(e.target.value)}
                 style={{ padding: "9px 12px", borderRadius: 6, border: `1px solid ${C.bordo}`, fontSize: 13, background: C.bianco, color: C.testo }}>
                 <option value="">Ambito auto-rilevato</option>
