@@ -103,31 +103,36 @@ async function importaInSupabase(risultato, setImportProgress, setImportStato) {
     const ambito_id = ambitoData?.id;
     if (!ambito_id) throw new Error(`Ambito "${ambitoCodice}" non trovato in database`);
 
-    // 2. Insert decreto (ON CONFLICT DO NOTHING)
+    // 2. Insert decreto
     setImportProgress("Inserimento decreto...");
-    const { data: decretoData } = await supabase.schema("contributi_mic").from("decreti").upsert({
-      numero_rep: decreto.numero_rep,
-      data: decreto.data,
-      anno_finanziario: decreto.anno_finanziario,
-      tipo: "MIC_FNSV",
-      fondo: "Fondo Nazionale per lo Spettacolo dal Vivo",
-      ente_erogante: "MIC - DG Spettacolo",
-      ambito_id,
-      descrizione: `Contributi ${decreto.ambito} ${decreto.anno_finanziario}`,
-      stanziamento_totale: decreto.stanziamento_totale,
-    }, { onConflict: "numero_rep,anno_finanziario,tipo", ignoreDuplicates: false }).select("id").single();
+    
+    // Prima controlla se esiste
+    const { data: decExisting } = await supabase.schema("contributi_mic").from("decreti")
+      .select("id")
+      .eq("numero_rep", decreto.numero_rep || "000")
+      .eq("anno_finanziario", decreto.anno_finanziario || 2025)
+      .maybeSingle();
 
-    const decreto_id = decretoData?.id;
-    if (!decreto_id) {
-      // Prendi ID esistente
-      const { data: existing } = await supabase.schema("contributi_mic").from("decreti")
-        .select("id").eq("numero_rep", decreto.numero_rep).eq("anno_finanziario", decreto.anno_finanziario).single();
-      if (!existing) throw new Error("Impossibile creare o trovare il decreto");
+    let dec_id = decExisting?.id;
+
+    if (!dec_id) {
+      // Crea nuovo decreto
+      const { data: newDec, error: decErr } = await supabase.schema("contributi_mic").from("decreti").insert({
+        numero_rep: decreto.numero_rep || "TEMP_" + Date.now(),
+        data: decreto.data || new Date().toISOString().slice(0, 10),
+        anno_finanziario: decreto.anno_finanziario || 2025,
+        tipo: "MIC_FNSV",
+        fondo: "Fondo Nazionale per lo Spettacolo dal Vivo",
+        ente_erogante: "MIC - DG Spettacolo",
+        ambito_id,
+        descrizione: `Contributi ${ambitoCodice} ${decreto.anno_finanziario || 2025}`,
+        stanziamento_totale: decreto.stanziamento_totale || 0,
+      }).select("id").single();
+      if (decErr) throw new Error("Errore creazione decreto: " + decErr.message);
+      dec_id = newDec?.id;
     }
 
-    const { data: dec } = await supabase.schema("contributi_mic").from("decreti")
-      .select("id").eq("numero_rep", decreto.numero_rep).eq("anno_finanziario", decreto.anno_finanziario).single();
-    const dec_id = dec?.id;
+    if (!dec_id) throw new Error("Impossibile creare o trovare il decreto");
 
     // 3. Per ogni sezione
     for (let si = 0; si < sezioni.length; si++) {
