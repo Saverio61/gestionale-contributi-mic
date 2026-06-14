@@ -171,26 +171,33 @@ async function importaInSupabase(risultato, setImportProgress, setImportStato) {
               }
             }
 
-            // Trova o crea organismo
+            // Trova o crea organismo — comune opzionale
             const { data: orgExisting } = await supabase.schema("contributi_mic").from("organismi")
-              .select("id").eq("denominazione", org.denominazione).eq("ambito_id", ambito_id).limit(1);
+              .select("id, comune_id").eq("denominazione", org.denominazione).eq("ambito_id", ambito_id).limit(1);
 
             let organismo_id;
             if (orgExisting?.length) {
               organismo_id = orgExisting[0].id;
-              // Aggiorna comune se mancante
+              // Aggiorna comune se ora disponibile e prima mancante
               if (comune_id && !orgExisting[0].comune_id) {
                 await supabase.schema("contributi_mic").from("organismi")
-                  .update({ comune_id }).eq("id", organismo_id);
+                  .update({ comune_id, settore_id }).eq("id", organismo_id);
               }
             } else {
-              const { data: newOrg } = await supabase.schema("contributi_mic").from("organismi")
-                .insert({ denominazione: org.denominazione, ambito_id, settore_id, comune_id })
+              // Inserisce organismo anche senza comune
+              const { data: newOrg, error: orgErr } = await supabase.schema("contributi_mic").from("organismi")
+                .insert({ 
+                  denominazione: org.denominazione, 
+                  ambito_id, 
+                  settore_id, 
+                  ...(comune_id ? { comune_id } : {})
+                })
                 .select("id").single();
+              if (orgErr) { errori++; continue; }
               organismo_id = newOrg?.id;
             }
 
-            if (!organismo_id) continue;
+            if (!organismo_id) { errori++; continue; }
 
             // Insert assegnazione
             const contributo = org.contributo_anno || org.contributo_2026 || 0;
