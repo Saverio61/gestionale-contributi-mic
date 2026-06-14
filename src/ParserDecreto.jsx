@@ -93,7 +93,7 @@ function dividiInChunk(testo) {
   const chunks = [];
   let chunk = [];
   for (const line of lines) {
-    if (line.match(/^Art\.\s*\d+/) && chunk.length > 5) {
+    if (line.match(/^Art\.\s*\d+/) && chunk.length > 3) {
       chunks.push(chunk.join("\n"));
       chunk = [];
     }
