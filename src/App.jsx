@@ -156,17 +156,15 @@ function ModalOrganismo({ riga, onClose }) {
   const [storico, setStorico] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSede, setShowSede] = useState(false);
-  const [organismoId, setOrganismoId] = useState(null);
   const isRegione = riga.tipo_decreto === 'REG_PU';
+  // Usa id_organismo dalla view direttamente
+  const organismoId = riga.id_organismo;
 
   const carica = useCallback(async () => {
     setLoading(true);
-    const [{ data: st }, { data: og }] = await Promise.all([
-      supabase.schema("contributi_mic").from("v_assegnazioni").select("*").eq("denominazione", riga.denominazione).order("anno"),
-      supabase.schema("contributi_mic").from("organismi").select("id").eq("denominazione", riga.denominazione).limit(1),
-    ]);
+    const { data: st } = await supabase.schema("contributi_mic").from("v_assegnazioni")
+      .select("*").eq("denominazione", riga.denominazione).order("anno");
     setStorico(st || []);
-    if (og?.[0]) setOrganismoId(og[0].id);
     setLoading(false);
   }, [riga.denominazione]);
 
