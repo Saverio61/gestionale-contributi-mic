@@ -59,33 +59,22 @@ async function chiamaClaude(prompt, testo) {
 }
 
 function pulisciTesto(testo) {
-  // Rimuovi intestazioni ripetute del MIC
-  return testo
-    .replace(/Ministero della cultura[\s\S]{0,300}?PEO:[^
-]+
-/g, "")
-    .replace(/DIPARTIMENTO PER LE ATTIVITÀ CULTURALI
-/g, "")
-    .replace(/DIREZIONE GENERALE SPETTACOLO
-/g, "")
-    .replace(/Piazza Santa Croce[^
-]+
-/g, "")
-    .replace(/\+39[^
-]+
-/g, "")
-    .replace(/PEC:[^
-]+
-/g, "")
-    .replace(/PEO:[^
-]+
-/g, "")
-    .replace(/pag\. \d+ di \d+
-/g, "")
-    .replace(/
-{3,}/g, "
-
-");
+  const righe = testo.split("\n");
+  const pulite = [];
+  for (let i = 0; i < righe.length; i++) {
+    const r = righe[i];
+    if (r.includes("Ministero della cultura") ||
+        r.includes("DIPARTIMENTO PER LE ATTIVIT") ||
+        r.includes("DIREZIONE GENERALE SPETTACOLO") ||
+        r.includes("Piazza Santa Croce") ||
+        r.includes("PEC:") || r.includes("PEO:") ||
+        /^pag\. \d+ di \d+/.test(r) ||
+        /^\+39/.test(r)) {
+      continue;
+    }
+    pulite.push(r);
+  }
+  return pulite.join("\n").replace(/\n{3,}/g, "\n\n");
 }
 
 function dividiInChunk(testo) {
@@ -93,7 +82,7 @@ function dividiInChunk(testo) {
   const chunks = [];
   let chunk = [];
   for (const line of lines) {
-    if (line.match(/^Art\.\s*\d+/) && chunk.length > 3) {
+    if (line.match(/^Art\.\s*\d+/) && chunk.length > 5) {
       chunks.push(chunk.join("\n"));
       chunk = [];
     }
