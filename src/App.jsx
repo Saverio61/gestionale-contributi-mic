@@ -2,58 +2,61 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import ParserDecreto from "./ParserDecreto";
 
-const T = {
-  inchiostro: "#0A1628", marino: "#003D8F", marinoChi: "#E8EDF7",
-  oro: "#C49A00", oroChi: "#FEF3C7",
-  verde: "#1A6B3C", verdeChi: "#E8F5EE",
-  viola: "#5B21B6", violaChi: "#EDE9FE",
-  arancio: "#C2410C", arancioChi: "#FFF0E6",
-  sfondo: "#F4F5F7", bianco: "#FFFFFF",
-  bordo: "#DDE1E8", testo: "#1A2332",
-  muted: "#5E6B7C", mutedChi: "#E4E7EC",
-};
-
 const fmt = (n) => n != null ? new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n) : "--";
 const mono = { fontFamily: "'Courier New', monospace" };
-const SOTTOINSIEMI = ['', 'Primo', 'Secondo', 'Terzo', 'Quarto', 'Quinto'];
 
-const TIPO_COLORS = {
-  'MIC_FNSV': { bg: T.marinoChi, color: T.marino, label: 'MIC · FNSV' },
-  'REG_PU':   { bg: T.arancioChi, color: T.arancio, label: 'Regione Puglia' },
+const AMBITO_COLORS = {
+  "Danza": "#1D4ED8", "Musica": "#6D28D9", "Teatro": "#B91C1C",
+  "Circo e Spettacolo Viaggiante": "#B45309", "Multidisciplinare": "#047857",
+  "Regione Puglia - FNSV": "#C2410C",
+};
+
+const T = {
+  inchiostro: "#0A1628", marino: "#1D4ED8", marinoChi: "#DBEAFE",
+  oro: "#B8860B", oroChi: "#FEF9C3",
+  verde: "#065F46", verdeChi: "#D1FAE5",
+  viola: "#5B21B6", violaChi: "#EDE9FE",
+  arancio: "#C2410C", arancioChi: "#FFEDD5",
+  sfondo: "#F1F3F6", bianco: "#FFFFFF",
+  bordo: "#CBD5E1", testo: "#0F172A",
+  sub: "#374151",   // testo secondario — scuro abbastanza
+  muted: "#6B7280", // solo per label
 };
 
 // ── TOPBAR ────────────────────────────────────────────────────
 function Topbar({ sezione, setSezione }) {
   const voci = [
-    { id: "dashboard",         label: "Dashboard" },
-    { id: "assegnazioni",      label: "Assegnazioni" },
-    { id: "puglia_basilicata", label: "Puglia & Basilicata" },
-    { id: "decreti",           label: "Decreti" },
-    { id: "parser",            label: "Importa" },
+    { id: "dashboard",         label: "Dashboard",           icon: "⊞" },
+    { id: "organismi",         label: "Organismi",           icon: "🏛" },
+    { id: "puglia_basilicata", label: "Puglia & Basilicata", icon: "◎", highlight: true },
+    { id: "decreti",           label: "Decreti",             icon: "▤" },
+    { id: "parser",            label: "Importa",             icon: "↑" },
   ];
   return (
-    <div style={{ background: T.inchiostro, flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
-      <div style={{ background: "#071020", padding: "5px 32px", display: "flex", gap: 20, alignItems: "center" }}>
-        <span style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>AGIS Puglia e Basilicata</span>
+    <div style={{ background: T.inchiostro, flexShrink: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.25)" }}>
+      <div style={{ background: "#060F1E", padding: "4px 32px", display: "flex", gap: 16, alignItems: "center" }}>
+        <span style={{ fontSize: 9, letterSpacing: 2.5, textTransform: "uppercase", color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>AGIS Puglia e Basilicata</span>
         <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
-        <span style={{ fontSize: 10, color: T.oro, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>Gestionale Contributi Spettacolo dal Vivo</span>
+        <span style={{ fontSize: 9, color: T.oro, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700 }}>Gestionale Contributi Spettacolo dal Vivo</span>
       </div>
       <div style={{ padding: "0 32px", display: "flex", alignItems: "stretch" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, paddingRight: 28, borderRight: "1px solid rgba(255,255,255,0.07)", marginRight: 8 }}>
-          <div style={{ width: 28, height: 28, background: T.oro, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 13, color: T.inchiostro, ...mono }}>G</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: T.bianco, lineHeight: 1 }}>Gestionale</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 24, borderRight: "1px solid rgba(255,255,255,0.07)", marginRight: 6 }}>
+          <div style={{ width: 30, height: 30, background: `linear-gradient(135deg,${T.oro},#8B6400)`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, color: T.inchiostro, ...mono }}>G</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#FFFFFF" }}>Gestionale</div>
         </div>
         {voci.map(v => {
           const attivo = sezione === v.id;
           return (
             <button key={v.id} onClick={() => setSezione(v.id)} style={{
-              padding: "15px 16px", border: "none", cursor: "pointer", fontSize: 13,
-              background: "transparent",
-              color: attivo ? T.bianco : "rgba(255,255,255,0.42)",
-              fontWeight: attivo ? 700 : 400,
+              padding: "14px 15px", border: "none", cursor: "pointer", fontSize: 12,
+              background: v.highlight && !attivo ? "rgba(184,134,11,0.1)" : "transparent",
+              color: attivo ? "#FFFFFF" : v.highlight ? "#F0C040" : "rgba(255,255,255,0.55)",
+              fontWeight: attivo ? 700 : v.highlight ? 700 : 400,
               borderBottom: attivo ? `2px solid ${T.oro}` : "2px solid transparent",
-              transition: "all 0.15s", whiteSpace: "nowrap",
-            }}>{v.label}</button>
+              transition: "all 0.15s", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5,
+            }}>
+              <span style={{ fontSize: 11 }}>{v.icon}</span>{v.label}
+            </button>
           );
         })}
       </div>
@@ -62,36 +65,29 @@ function Topbar({ sezione, setSezione }) {
 }
 
 // ── BADGE ─────────────────────────────────────────────────────
-function BadgeRegione({ regione }) {
-  if (!regione) return <span style={{ color: T.mutedChi }}>—</span>;
-  const isPugBas = regione === "Puglia" || regione === "Basilicata";
-  return <span style={{ background: isPugBas ? T.oroChi : T.marinoChi, color: isPugBas ? T.oro : T.marino, padding: "2px 7px", borderRadius: 3, fontSize: 10, fontWeight: 700, border: `1px solid ${isPugBas ? T.oro+"40" : T.marino+"25"}`, whiteSpace: "nowrap", ...mono }}>{regione}</span>;
+function BadgeAmbito({ ambito }) {
+  const color = AMBITO_COLORS[ambito] || T.muted;
+  const label = ambito?.replace("Circo e Spettacolo Viaggiante", "Circo").replace("Regione Puglia - FNSV", "Reg. Puglia");
+  return (
+    <span style={{ background: color + "20", color, border: `1px solid ${color}50`, padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+      {label}
+    </span>
+  );
 }
 
 function BadgeTipo({ tipo }) {
-  const cfg = TIPO_COLORS[tipo] || { bg: T.mutedChi, color: T.muted, label: tipo };
-  return <span style={{ background: cfg.bg, color: cfg.color, padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 700, border: `1px solid ${cfg.color}30`, whiteSpace: "nowrap", ...mono }}>{cfg.label}</span>;
+  if (tipo === "REG_PU") return <span style={{ background: "#FFEDD5", color: "#9A3412", border: "1px solid #FED7AA", padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 700, ...mono }}>Reg. Puglia</span>;
+  return <span style={{ background: "#DBEAFE", color: "#1E3A8A", border: "1px solid #BFDBFE", padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 700, ...mono }}>MIC · FNSV</span>;
 }
 
-function BadgeSottoinsieme({ n }) {
-  if (!n || n <= 1) return null;
-  return <span style={{ background: T.violaChi, color: T.viola, padding: "1px 6px", borderRadius: 3, fontSize: 9, fontWeight: 700, ...mono, marginLeft: 4 }}>{SOTTOINSIEMI[n] || n}°</span>;
-}
-
-// ── BARRA PUNTEGGIO ───────────────────────────────────────────
-function BarraPunteggio({ label, valore, max = 35, colore }) {
-  const pct = Math.min(100, ((valore || 0) / max) * 100);
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
-        <span style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 600 }}>{label}</span>
-        <span style={{ fontWeight: 700, color: T.testo, ...mono, fontSize: 13 }}>{valore?.toFixed(2) || "0.00"}<span style={{ color: T.muted, fontWeight: 400, fontSize: 11 }}>/{max}</span></span>
-      </div>
-      <div style={{ height: 7, background: T.mutedChi, borderRadius: 4 }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: colore, borderRadius: 4, transition: "width 0.5s ease" }} />
-      </div>
-    </div>
-  );
+function BadgeRegione({ regione }) {
+  if (!regione) return <span style={{ color: T.muted }}>—</span>;
+  const isPU = regione === "Puglia";
+  const isBA = regione === "Basilicata";
+  const color = isPU ? "#92400E" : isBA ? "#065F46" : T.muted;
+  const bg = isPU ? "#FEF9C3" : isBA ? "#D1FAE5" : "#F1F5F9";
+  const border = isPU ? "#FCD34D" : isBA ? "#6EE7B7" : T.bordo;
+  return <span style={{ background: bg, color, border: `1px solid ${border}`, padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700, ...mono }}>{regione}</span>;
 }
 
 // ── FORM SEDE ─────────────────────────────────────────────────
@@ -116,191 +112,174 @@ function FormSede({ organismo_id, onSaved }) {
   async function salva() {
     if (!comuneSel) return;
     setSaving(true);
-    const { error } = await supabase.schema("contributi_mic").from("organismi").update({ comune_id: comuneSel }).eq("id", organismo_id);
+    const { error } = await supabase.schema("contributi_mic").from("organismi").update({ comune_id: parseInt(comuneSel) }).eq("id", organismo_id);
     setSaving(false);
     if (error) setMsg("Errore: " + error.message);
-    else { setMsg("Sede aggiornata."); setTimeout(onSaved, 900); }
+    else { setMsg("✓ Sede aggiornata."); setTimeout(onSaved, 1000); }
   }
 
   const sel = { padding: "7px 10px", borderRadius: 5, border: `1px solid ${T.bordo}`, fontSize: 12, background: T.bianco, color: T.testo };
   return (
-    <div style={{ background: T.marinoChi, border: `1px solid ${T.marino}25`, borderRadius: 7, padding: "14px 16px", marginBottom: 18 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: T.marino, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Modifica sede</div>
+    <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, padding: "14px 16px", marginBottom: 18 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#1E3A8A", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Modifica sede</div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div>
-          <div style={{ fontSize: 10, color: T.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Provincia</div>
+          <div style={{ fontSize: 10, color: T.sub, marginBottom: 4, fontWeight: 600 }}>Provincia</div>
           <select value={provSel} onChange={e => { setProvSel(e.target.value); setComuneSel(""); }} style={{ ...sel, minWidth: 200 }}>
             <option value="">— Seleziona —</option>
             {province.map(p => <option key={p.id} value={p.id}>{p.nome} ({p.codice}) · {p.regione?.nome}</option>)}
           </select>
         </div>
         <div>
-          <div style={{ fontSize: 10, color: T.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Comune</div>
+          <div style={{ fontSize: 10, color: T.sub, marginBottom: 4, fontWeight: 600 }}>Comune</div>
           <select value={comuneSel} onChange={e => setComuneSel(e.target.value)} disabled={comuni.length === 0} style={{ ...sel, minWidth: 160, background: comuni.length === 0 ? T.sfondo : T.bianco }}>
             <option value="">— Seleziona —</option>
             {comuni.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
         </div>
         <button onClick={salva} disabled={!comuneSel || saving}
-          style={{ padding: "7px 18px", borderRadius: 5, border: "none", background: comuneSel ? T.marino : T.mutedChi, color: T.bianco, fontSize: 12, fontWeight: 600, cursor: comuneSel ? "pointer" : "default" }}>
+          style={{ padding: "7px 18px", borderRadius: 5, border: "none", background: comuneSel ? "#1D4ED8" : T.bordo, color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: comuneSel ? "pointer" : "default" }}>
           {saving ? "Salvo…" : "Salva"}
         </button>
-        {msg && <span style={{ fontSize: 12, color: T.verde, fontWeight: 600 }}>{msg}</span>}
+        {msg && <span style={{ fontSize: 12, color: "#065F46", fontWeight: 700 }}>{msg}</span>}
       </div>
     </div>
   );
 }
 
-// ── MODAL DETTAGLIO ───────────────────────────────────────────
-function ModalOrganismo({ riga, onClose }) {
-  const [storico, setStorico] = useState([]);
-  const [loading, setLoading] = useState(true);
+// ── SCHEDA ORGANISMO (modal) ──────────────────────────────────
+function SchedaOrganismo({ org, onClose }) {
   const [showSede, setShowSede] = useState(false);
-  const isRegione = riga.tipo_decreto === 'REG_PU';
-  // Usa id_organismo dalla view direttamente
-  const organismoId = riga.id_organismo;
+  const [dati, setDati] = useState(org);
 
-  const carica = useCallback(async () => {
-    setLoading(true);
-    const { data: st } = await supabase.schema("contributi_mic").from("v_assegnazioni")
-      .select("*").eq("denominazione", riga.denominazione).order("anno");
-    setStorico(st || []);
-    setLoading(false);
-  }, [riga.denominazione]);
+  async function ricarica() {
+    const { data } = await supabase.schema("contributi_mic").from("v_assegnazioni").select("*").eq("denominazione", org.denominazione).order("anno");
+    if (data?.length) {
+      const first = data[0];
+      setDati({ ...org, comune: first.comune, sigla_provincia: first.sigla_provincia, regione: first.regione, assegnazioni: data });
+    }
+    setShowSede(false);
+  }
 
-  useEffect(() => { carica(); }, [carica]);
-
-  const sedeOk = riga.comune && riga.sigla_provincia;
+  const ass = dati.assegnazioni || [];
+  const totMIC = ass.filter(a => a.tipo_decreto === "MIC_FNSV").reduce((s, a) => s + (a.contributo_assegnato || 0), 0);
+  const totReg = ass.filter(a => a.tipo_decreto === "REG_PU").reduce((s, a) => s + (a.contributo_assegnato || 0), 0);
+  const anni = [...new Set(ass.map(a => a.anno))].sort();
+  const ambiti = [...new Set(ass.map(a => a.ambito))];
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,40,0.72)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: T.bianco, borderRadius: 12, width: "min(800px,100%)", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.4)" }}>
+      <div style={{ background: T.bianco, borderRadius: 14, width: "min(820px,100%)", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.4)" }}>
 
         {/* Header */}
-        <div style={{ background: `linear-gradient(135deg, ${T.inchiostro} 0%, #1A2E50 100%)`, padding: "20px 26px", flexShrink: 0, borderBottom: `3px solid ${T.oro}` }}>
+        <div style={{ background: `linear-gradient(135deg,${T.inchiostro} 0%,#1A2E50 100%)`, padding: "20px 24px", borderBottom: `3px solid ${T.oro}`, flexShrink: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ flex: 1, paddingRight: 16 }}>
-              <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <BadgeTipo tipo={riga.tipo_decreto} />
-                <span style={{ background: T.oro+"28", color: T.oro, padding: "2px 10px", borderRadius: 3, fontSize: 10, fontWeight: 700, ...mono, textTransform: "uppercase", letterSpacing: 1 }}>{riga.ambito}</span>
-                <span style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", padding: "2px 10px", borderRadius: 3, fontSize: 10, ...mono }}>{riga.articolo_dm}</span>
-                {riga.numero_sottoinsieme > 1 && <BadgeSottoinsieme n={riga.numero_sottoinsieme} />}
-                {riga.prima_istanza_triennale && <span style={{ background: T.oroChi, color: T.oro, padding: "2px 10px", borderRadius: 3, fontSize: 10, fontWeight: 700 }}>1ª istanza</span>}
+              <div style={{ display: "flex", gap: 7, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <BadgeRegione regione={dati.regione} />
+                {ambiti.map(a => <BadgeAmbito key={a} ambito={a} />)}
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: T.bianco, lineHeight: 1.3 }}>{riga.denominazione}</div>
-              {riga.codice_fiscale && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 4, ...mono }}>CF: {riga.codice_fiscale}</div>}
-              {riga.titolo_progetto && <div style={{ fontSize: 11, color: T.oro, marginTop: 5, fontStyle: "italic" }}>{riga.titolo_progetto}</div>}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-                <span style={{ fontSize: 12, color: sedeOk ? "rgba(255,255,255,0.5)" : T.oro }}>
-                  {sedeOk ? `${riga.comune} (${riga.sigla_provincia}) · ${riga.regione}` : "⚠ Sede non registrata"}
-                </span>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#FFFFFF", lineHeight: 1.3 }}>{dati.denominazione}</div>
+              <div style={{ marginTop: 8, display: "flex", gap: 20, flexWrap: "wrap" }}>
+                {dati.comune && (
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: 500 }}>
+                    📍 {dati.comune} ({dati.sigla_provincia})
+                  </span>
+                )}
+                {dati.codice_fiscale && (
+                  <span style={{ fontSize: 12, color: "#FCD34D", fontWeight: 700, ...mono }}>
+                    CF: {dati.codice_fiscale}
+                  </span>
+                )}
                 <button onClick={() => setShowSede(!showSede)}
-                  style={{ fontSize: 10, background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer", ...mono }}>
-                  {showSede ? "✕ chiudi" : "✎ sede"}
+                  style={{ fontSize: 10, background: "rgba(255,255,255,0.12)", color: "#FFFFFF", border: "none", borderRadius: 4, padding: "3px 9px", cursor: "pointer", fontWeight: 600 }}>
+                  {showSede ? "✕ chiudi" : "✎ modifica sede"}
                 </button>
               </div>
             </div>
-            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "rgba(255,255,255,0.6)", width: 32, height: 32, borderRadius: 6, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✕</button>
+            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#FFFFFF", width: 32, height: 32, borderRadius: 6, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
           </div>
         </div>
 
-        <div style={{ overflow: "auto", flex: 1, padding: "22px 26px" }}>
-          {showSede && organismoId && <FormSede organismo_id={organismoId} onSaved={() => { setShowSede(false); carica(); }} />}
+        <div style={{ overflow: "auto", flex: 1, padding: "20px 24px" }}>
+          {showSede && dati.id_organismo && <FormSede organismo_id={dati.id_organismo} onSaved={ricarica} />}
 
-          {!loading && (
-            <>
-              {/* Punteggi MIC */}
-              {!isRegione && (
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14 }}>Punteggi MIC — anno {riga.anno}</div>
-                  <div style={{ background: T.sfondo, borderRadius: 8, padding: "16px 18px", marginBottom: 12 }}>
-                    <BarraPunteggio label="VD – Valore Dimensionale" valore={riga.punteggio_vd} max={35} colore={T.marino} />
-                    <BarraPunteggio label="QA – Qualità Artistica" valore={riga.punteggio_qa} max={32} colore={T.oro} />
-                    <BarraPunteggio label="QI – Qualità Indicizzata" valore={riga.punteggio_qi} max={30} colore={T.viola} />
-                    <BarraPunteggio label="DA – Dimensione Attività" valore={riga.punteggio_da} max={50} colore={T.verde} />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <div style={{ background: T.sfondo, borderRadius: 8, padding: "14px 18px", borderLeft: `3px solid ${T.marino}` }}>
-                      <div style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Punteggio Totale</div>
-                      <div style={{ fontSize: 32, fontWeight: 900, color: T.marino, ...mono }}>{riga.punteggio_tot?.toFixed(2)}</div>
-                      {riga.posizione_graduatoria > 0 && <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>Posizione #{riga.posizione_graduatoria}</div>}
-                    </div>
-                    <div style={{ background: T.verdeChi, borderRadius: 8, padding: "14px 18px", borderLeft: `3px solid ${T.verde}` }}>
-                      <div style={{ fontSize: 10, color: T.verde, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Contributo MIC {riga.anno}</div>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: T.verde, ...mono }}>{fmt(riga.contributo_assegnato)}</div>
-                      {riga.stanziamento_totale_settore > 0 && <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>Stanziamento settore: {fmt(riga.stanziamento_totale_settore)}</div>}
-                    </div>
-                  </div>
-                </div>
-              )}
+          {/* KPI */}
+          <div style={{ display: "grid", gridTemplateColumns: totReg > 0 ? "repeat(3,1fr)" : "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ background: "#EFF6FF", borderRadius: 8, padding: "14px 16px", borderLeft: `3px solid #1D4ED8` }}>
+              <div style={{ fontSize: 10, color: "#1E3A8A", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>Totale MIC/FNSV</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: "#1E3A8A", ...mono }}>{fmt(totMIC)}</div>
+              <div style={{ fontSize: 11, color: T.sub, marginTop: 3 }}>{anni.length > 1 ? `${anni[0]}–${anni[anni.length-1]}` : anni[0]}</div>
+            </div>
+            {totReg > 0 && (
+              <div style={{ background: "#FFEDD5", borderRadius: 8, padding: "14px 16px", borderLeft: `3px solid #C2410C` }}>
+                <div style={{ fontSize: 10, color: "#9A3412", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>Regione Puglia</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: "#9A3412", ...mono }}>{fmt(totReg)}</div>
+                <div style={{ fontSize: 11, color: T.sub, marginTop: 3 }}>POC 2021-2027</div>
+              </div>
+            )}
+            <div style={{ background: "#D1FAE5", borderRadius: 8, padding: "14px 16px", borderLeft: `3px solid #065F46` }}>
+              <div style={{ fontSize: 10, color: "#065F46", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>Totale cumulato</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: "#065F46", ...mono }}>{fmt(totMIC + totReg)}</div>
+              <div style={{ fontSize: 11, color: T.sub, marginTop: 3 }}>{ass.length} assegnazioni</div>
+            </div>
+          </div>
 
-              {/* Dati Regione */}
-              {isRegione && (
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14 }}>Contributo Regione Puglia — POC 2021-2027</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 12 }}>
-                    {[
-                      { label: "Contributo base", value: fmt(riga.contributo_base), color: T.marino },
-                      { label: "Quota aggiuntiva", value: fmt(riga.quota_aggiuntiva), color: T.viola },
-                      { label: "Contributo annuale", value: fmt(riga.contributo_assegnato), color: T.verde },
-                    ].map(k => (
-                      <div key={k.label} style={{ background: T.sfondo, borderRadius: 8, padding: "14px 16px", borderLeft: `3px solid ${k.color}` }}>
-                        <div style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>{k.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: k.color, ...mono }}>{k.value}</div>
-                      </div>
+          {/* Tabella assegnazioni */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.sub, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 12 }}>Tutte le assegnazioni</div>
+          <div style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${T.bordo}` }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: T.inchiostro }}>
+                  {["Anno","Fonte","Ambito","Settore","Sott.","VD","QA","QI","DA","TOT","Contributo"].map(h => (
+                    <th key={h} style={{ padding: "9px 10px", textAlign: h === "Contributo" ? "right" : "left", color: "rgba(255,255,255,0.8)", fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ass.sort((a,b) => a.anno - b.anno || (a.ambito||"").localeCompare(b.ambito||"")).map((a, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${T.bordo}`, background: i % 2 === 0 ? T.bianco : T.sfondo }}>
+                    <td style={{ padding: "9px 10px", fontWeight: 800, color: "#1E3A8A", ...mono }}>{a.anno}</td>
+                    <td style={{ padding: "9px 10px" }}><BadgeTipo tipo={a.tipo_decreto} /></td>
+                    <td style={{ padding: "9px 10px" }}><BadgeAmbito ambito={a.ambito} /></td>
+                    <td style={{ padding: "9px 10px", color: T.sub, fontSize: 11, ...mono, fontWeight: 600 }}>{a.articolo_dm}</td>
+                    <td style={{ padding: "9px 10px", fontSize: 11, color: T.sub, fontWeight: 600 }}>
+                      {a.numero_sottoinsieme > 1 ? `${["","1°","2°","3°","4°","5°"][a.numero_sottoinsieme]}` : "—"}
+                    </td>
+                    {[a.punteggio_vd, a.punteggio_qa, a.punteggio_qi, a.punteggio_da].map((v, vi) => (
+                      <td key={vi} style={{ padding: "9px 8px", ...mono, color: v > 0 ? "#0F172A" : T.muted, fontSize: 11, fontWeight: v > 0 ? 700 : 400 }}>{v > 0 ? v.toFixed(2) : "—"}</td>
                     ))}
-                  </div>
-                  <div style={{ background: T.verdeChi, borderRadius: 8, padding: "14px 18px", borderLeft: `3px solid ${T.verde}` }}>
-                    <div style={{ fontSize: 10, color: T.verde, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600, marginBottom: 4 }}>Contributo Triennale 2025-2027</div>
-                    <div style={{ fontSize: 28, fontWeight: 900, color: T.verde, ...mono }}>{fmt(riga.contributo_assegnato * 3)}</div>
-                  </div>
-                </div>
-              )}
+                    <td style={{ padding: "9px 8px", fontWeight: 800, color: "#1E3A8A", ...mono, fontSize: 12 }}>{a.punteggio_tot > 0 ? a.punteggio_tot.toFixed(2) : "—"}</td>
+                    <td style={{ padding: "9px 10px", fontWeight: 800, color: "#065F46", ...mono, textAlign: "right", fontSize: 12 }}>{fmt(a.contributo_assegnato)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: "#F8FAFC", borderTop: `2px solid ${T.bordo}` }}>
+                  <td colSpan={10} style={{ padding: "9px 10px", fontWeight: 700, color: T.testo }}>TOTALE ({ass.length} assegnazioni)</td>
+                  <td style={{ padding: "9px 10px", fontWeight: 900, color: "#065F46", ...mono, textAlign: "right", fontSize: 13 }}>{fmt(totMIC + totReg)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
 
-              {/* Storico */}
-              {storico.length > 1 && (
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 12 }}>Storico · {storico.length} voci</div>
-                  <div style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${T.bordo}` }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                      <thead>
-                        <tr style={{ background: T.sfondo, borderBottom: `2px solid ${T.bordo}` }}>
-                          {["Anno","Fonte","Settore","Sott.","VD","QA","QI","DA","TOT","Contributo"].map(h => (
-                            <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: T.muted, fontSize: 10, textTransform: "uppercase", fontWeight: 700 }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {storico.map((s, i) => (
-                          <tr key={i} style={{ borderBottom: `1px solid ${T.bordo}`, background: s.anno === riga.anno && s.tipo_decreto === riga.tipo_decreto ? T.oroChi : i % 2 === 0 ? T.bianco : T.sfondo }}>
-                            <td style={{ padding: "8px 10px", fontWeight: 800, color: T.marino, ...mono }}>{s.anno}</td>
-                            <td style={{ padding: "8px 10px" }}><BadgeTipo tipo={s.tipo_decreto} /></td>
-                            <td style={{ padding: "8px 10px", color: T.muted, fontSize: 11 }}>{s.articolo_dm}</td>
-                            <td style={{ padding: "8px 10px", fontSize: 10 }}>{s.numero_sottoinsieme > 1 ? <BadgeSottoinsieme n={s.numero_sottoinsieme} /> : "—"}</td>
-                            {[s.punteggio_vd, s.punteggio_qa, s.punteggio_qi, s.punteggio_da].map((v, vi) => (
-                              <td key={vi} style={{ padding: "8px 10px", ...mono, color: T.testo, fontSize: 11 }}>{v?.toFixed(2) || "—"}</td>
-                            ))}
-                            <td style={{ padding: "8px 10px", fontWeight: 800, color: T.marino, ...mono }}>{s.punteggio_tot?.toFixed(2) || "—"}</td>
-                            <td style={{ padding: "8px 10px", fontWeight: 700, color: T.verde, ...mono }}>{fmt(s.contributo_assegnato)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          {/* Titoli progetto */}
+          {ass.filter(a => a.titolo_progetto).map((a, i) => (
+            <div key={i} style={{ marginTop: 12, padding: "10px 14px", background: "#FFEDD5", borderRadius: 6, borderLeft: `3px solid #C2410C`, fontSize: 11 }}>
+              <span style={{ color: "#9A3412", fontWeight: 700 }}>Progetto Regione Puglia {a.anno}: </span>
+              <span style={{ color: T.testo, fontWeight: 500 }}>{a.titolo_progetto}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-// ── TABELLA ASSEGNAZIONI ──────────────────────────────────────
-function TabellaAssegnazioni({ dati, onSelectRiga, mostraPunteggi = false, mostraSottoinsieme = false }) {
-  const [sortCol, setSortCol] = useState("punteggio_tot");
+// ── TABELLA ORGANISMI ─────────────────────────────────────────
+function TabellaOrganismi({ organismi, onSelect }) {
+  const [sortCol, setSortCol] = useState("totale");
   const [sortDir, setSortDir] = useState("desc");
 
   function toggleSort(col) {
@@ -308,122 +287,187 @@ function TabellaAssegnazioni({ dati, onSelectRiga, mostraPunteggi = false, mostr
     else { setSortCol(col); setSortDir("desc"); }
   }
 
-  const sorted = [...dati].sort((a, b) => {
-    const va = a[sortCol], vb = b[sortCol];
+  const sorted = [...organismi].sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (sortCol === "totale") { va = a.totale; vb = b.totale; }
     if (va == null) return 1; if (vb == null) return -1;
-    if (typeof va === 'string') return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+    if (typeof va === "string") return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
     return sortDir === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
   });
 
   const Th = ({ col, label, right }) => (
     <th onClick={() => col && toggleSort(col)} style={{
       padding: "10px 11px", textAlign: right ? "right" : "left",
-      color: sortCol === col ? T.bianco : "rgba(255,255,255,0.5)",
-      fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.7,
+      color: sortCol === col ? "#FFFFFF" : "rgba(255,255,255,0.65)",
+      fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.6,
       whiteSpace: "nowrap", cursor: col ? "pointer" : "default",
-      background: sortCol === col ? "rgba(255,255,255,0.07)" : "transparent",
-      userSelect: "none", borderRight: "1px solid rgba(255,255,255,0.05)",
+      background: sortCol === col ? "rgba(255,255,255,0.08)" : "transparent",
+      userSelect: "none",
     }}>
-      {label}{col && sortCol === col && <span style={{ marginLeft: 4, opacity: 0.7 }}>{sortDir === "desc" ? "↓" : "↑"}</span>}
+      {label}{col && sortCol === col && <span style={{ marginLeft: 4 }}>{sortDir === "desc" ? "↓" : "↑"}</span>}
     </th>
   );
 
   return (
-    <div style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${T.bordo}`, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+    <div style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${T.bordo}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 750 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 800 }}>
           <thead>
             <tr style={{ background: T.inchiostro }}>
-              <Th col="anno" label="Anno" />
-              <Th label="Fonte" />
               <Th col="denominazione" label="Organismo" />
+              <Th label="CF" />
               <Th label="Sede" />
-              <Th label="Regione" />
-              <Th col="ambito" label="Ambito" />
-              <Th label="Settore" />
-              {mostraSottoinsieme && <Th col="numero_sottoinsieme" label="Sott." />}
-              {mostraPunteggi && <><Th col="punteggio_vd" label="VD" right /><Th col="punteggio_qa" label="QA" right /><Th col="punteggio_qi" label="QI" right /><Th col="punteggio_da" label="DA" right /></>}
-              <Th col="punteggio_tot" label="TOT" right />
-              <Th col="contributo_assegnato" label="Contributo" right />
-              <th style={{ padding: "10px 8px", width: 20, background: T.inchiostro }}></th>
+              <Th col="regione" label="Regione" />
+              <Th label="Ambiti" />
+              <Th label="Anni" />
+              <Th label="Fonti" />
+              <Th col="totale" label="Totale" right />
+              <th style={{ padding: "10px 8px", background: T.inchiostro, width: 20 }}></th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((d, i) => {
-              const isPugBas = d.regione === "Puglia" || d.regione === "Basilicata";
-              const isRegione = d.tipo_decreto === "REG_PU";
-              const rowBg = isPugBas ? "#FFFBF0" : isRegione ? "#FFF8F5" : i % 2 === 0 ? T.bianco : T.sfondo;
+            {sorted.map((o, i) => {
+              const isPugBas = o.regione === "Puglia" || o.regione === "Basilicata";
               return (
-                <tr key={`${d.id}-${i}`} onClick={() => onSelectRiga(d)}
-                  style={{ background: rowBg, borderBottom: `1px solid ${T.bordo}`, cursor: "pointer" }}>
-                  <td style={{ padding: "9px 11px", ...mono, fontWeight: 700, color: T.marino, fontSize: 11 }}>{d.anno}</td>
-                  <td style={{ padding: "9px 11px" }}><BadgeTipo tipo={d.tipo_decreto} /></td>
-                  <td style={{ padding: "9px 11px" }}>
-                    <div style={{ fontWeight: 600, color: T.testo, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.denominazione}</div>
-                    {d.prima_istanza_triennale && <span style={{ fontSize: 9, background: T.oroChi, color: T.oro, padding: "1px 5px", borderRadius: 2, fontWeight: 700, ...mono }}>1ª ist.</span>}
+                <tr key={o.id} onClick={() => onSelect(o)}
+                  style={{ background: isPugBas ? "#FFFBF0" : i % 2 === 0 ? T.bianco : T.sfondo, borderBottom: `1px solid ${T.bordo}`, cursor: "pointer" }}>
+                  <td style={{ padding: "10px 11px", fontWeight: 700, color: "#0F172A", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.denominazione}</td>
+                  <td style={{ padding: "10px 11px", ...mono, fontSize: 11, color: "#1E3A8A", fontWeight: 700 }}>{o.codice_fiscale || <span style={{ color: T.muted }}>—</span>}</td>
+                  <td style={{ padding: "10px 11px", fontSize: 11, color: o.comune ? "#374151" : "#DC2626", whiteSpace: "nowrap", fontWeight: 600 }}>
+                    {o.comune ? `${o.comune} (${o.sigla_provincia})` : "⚠ mancante"}
                   </td>
-                  <td style={{ padding: "9px 11px", color: d.comune ? T.muted : "#FCA5A5", fontSize: 11, whiteSpace: "nowrap" }}>
-                    {d.comune ? `${d.comune} (${d.sigla_provincia})` : "⚠ mancante"}
+                  <td style={{ padding: "10px 11px" }}><BadgeRegione regione={o.regione} /></td>
+                  <td style={{ padding: "10px 11px" }}>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{o.ambiti.map(a => <BadgeAmbito key={a} ambito={a} />)}</div>
                   </td>
-                  <td style={{ padding: "9px 11px" }}><BadgeRegione regione={d.regione} /></td>
-                  <td style={{ padding: "9px 11px", color: T.muted, fontSize: 11 }}>{d.ambito}</td>
-                  <td style={{ padding: "9px 11px" }}>
-                    <div style={{ color: T.muted, fontSize: 10, ...mono, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.articolo_dm}</div>
-                    {d.descrizione_settore && d.descrizione_settore !== d.articolo_dm && (
-                      <div style={{ fontSize: 9, color: T.mutedChi, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.descrizione_settore}</div>
-                    )}
+                  <td style={{ padding: "10px 11px", ...mono, color: "#374151", fontWeight: 700, fontSize: 11 }}>{o.anni.join(", ")}</td>
+                  <td style={{ padding: "10px 11px" }}>
+                    <div style={{ display: "flex", gap: 4 }}>{o.fonti.map(f => <BadgeTipo key={f} tipo={f} />)}</div>
                   </td>
-                  {mostraSottoinsieme && <td style={{ padding: "9px 11px" }}>{d.numero_sottoinsieme > 1 ? <BadgeSottoinsieme n={d.numero_sottoinsieme} /> : <span style={{ color: T.mutedChi }}>—</span>}</td>}
-                  {mostraPunteggi && [d.punteggio_vd, d.punteggio_qa, d.punteggio_qi, d.punteggio_da].map((v, vi) => (
-                    <td key={vi} style={{ padding: "9px 8px", ...mono, fontSize: 11, color: T.testo, textAlign: "right" }}>{v > 0 ? v.toFixed(2) : "—"}</td>
-                  ))}
-                  <td style={{ padding: "9px 11px", ...mono, fontWeight: 800, color: T.marino, textAlign: "right" }}>{d.punteggio_tot > 0 ? d.punteggio_tot.toFixed(2) : "—"}</td>
-                  <td style={{ padding: "9px 11px", ...mono, fontWeight: 700, color: T.verde, textAlign: "right", whiteSpace: "nowrap" }}>{fmt(d.contributo_assegnato)}</td>
-                  <td style={{ padding: "9px 8px", color: T.mutedChi, fontSize: 16, textAlign: "center" }}>›</td>
+                  <td style={{ padding: "10px 11px", fontWeight: 800, color: "#065F46", ...mono, textAlign: "right", fontSize: 13 }}>{fmt(o.totale)}</td>
+                  <td style={{ padding: "10px 8px", color: "#94A3B8", fontSize: 16, textAlign: "center" }}>›</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      {dati.length === 0 && <div style={{ padding: 40, textAlign: "center", color: T.muted, fontStyle: "italic" }}>Nessun risultato.</div>}
+      {organismi.length === 0 && <div style={{ padding: 40, textAlign: "center", color: T.muted, fontStyle: "italic" }}>Nessun organismo trovato.</div>}
+    </div>
+  );
+}
+
+// ── HOOK ORGANISMI AGGREGATI ──────────────────────────────────
+function useOrganismi(filtriExtra) {
+  const [organismi, setOrganismi] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      let q = supabase.schema("contributi_mic").from("v_assegnazioni").select("*");
+      if (filtriExtra?.regioni) q = q.in("regione", filtriExtra.regioni);
+      const { data } = await q.order("denominazione");
+
+      // Aggrega per organismo
+      const map = {};
+      for (const a of (data || [])) {
+        const key = a.id_organismo;
+        if (!map[key]) {
+          map[key] = {
+            id: key,
+            id_organismo: key,
+            denominazione: a.denominazione,
+            codice_fiscale: a.codice_fiscale,
+            comune: a.comune,
+            sigla_provincia: a.sigla_provincia,
+            regione: a.regione,
+            ambiti: new Set(),
+            anni: new Set(),
+            fonti: new Set(),
+            totale: 0,
+            assegnazioni: [],
+          };
+        }
+        map[key].ambiti.add(a.ambito);
+        map[key].anni.add(a.anno);
+        map[key].fonti.add(a.tipo_decreto);
+        map[key].totale += a.contributo_assegnato || 0;
+        map[key].assegnazioni.push(a);
+      }
+
+      const lista = Object.values(map).map(o => ({
+        ...o,
+        ambiti: [...o.ambiti].filter(Boolean),
+        anni: [...o.anni].sort(),
+        fonti: [...o.fonti],
+      }));
+
+      setOrganismi(lista);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  return { organismi, loading };
+}
+
+// ── SEZIONE ORGANISMI ─────────────────────────────────────────
+function Organismi({ filtroRegionePre }) {
+  const { organismi, loading } = useOrganismi(filtroRegionePre ? { regioni: filtroRegionePre } : null);
+  const [cerca, setCerca] = useState("");
+  const [filtroAmbito, setFiltroAmbito] = useState("tutti");
+  const [filtroFonte, setFiltroFonte] = useState("tutti");
+  const [selected, setSelected] = useState(null);
+
+  const ambiti = ["tutti", ...new Set(organismi.flatMap(o => o.ambiti).filter(Boolean).sort())];
+
+  const filtrati = organismi.filter(o =>
+    (!cerca || o.denominazione?.toLowerCase().includes(cerca.toLowerCase()) ||
+               o.comune?.toLowerCase().includes(cerca.toLowerCase()) ||
+               (o.codice_fiscale || "").includes(cerca)) &&
+    (filtroAmbito === "tutti" || o.ambiti.includes(filtroAmbito)) &&
+    (filtroFonte === "tutti" || o.fonti.includes(filtroFonte))
+  );
+
+  const totale = filtrati.reduce((s, o) => s + o.totale, 0);
+
+  if (loading) return <div style={{ padding: 48, color: T.muted, fontStyle: "italic" }}>Caricamento organismi…</div>;
+
+  const sel = { padding: "7px 11px", borderRadius: 6, border: `1px solid ${T.bordo}`, fontSize: 12, background: T.bianco, color: T.testo };
+
+  return (
+    <div>
+      {selected && <SchedaOrganismo org={selected} onClose={() => setSelected(null)} />}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.muted, pointerEvents: "none" }}>🔍</span>
+          <input value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca organismo, comune, CF…"
+            style={{ ...sel, paddingLeft: 32, width: 250 }} />
+        </div>
+        <select value={filtroAmbito} onChange={e => setFiltroAmbito(e.target.value)} style={sel}>
+          {ambiti.map(a => <option key={a}>{a}</option>)}
+        </select>
+        <select value={filtroFonte} onChange={e => setFiltroFonte(e.target.value)} style={sel}>
+          <option value="tutti">Tutte le fonti</option>
+          <option value="MIC_FNSV">MIC · FNSV</option>
+          <option value="REG_PU">Regione Puglia</option>
+        </select>
+        <span style={{ fontSize: 12, color: T.sub, fontWeight: 600 }}>{filtrati.length} organismi · {fmt(totale)}</span>
+      </div>
+      <TabellaOrganismi organismi={filtrati} onSelect={setSelected} />
     </div>
   );
 }
 
 // ── KPI CARD ──────────────────────────────────────────────────
-function KpiCard({ label, value, sub, color, icon }) {
+function KpiCard({ label, value, sub, color, bg, icon }) {
   return (
-    <div style={{ background: T.bianco, border: `1px solid ${T.bordo}`, borderRadius: 10, padding: "18px 20px", position: "relative", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+    <div style={{ background: bg || T.bianco, border: `1px solid ${T.bordo}`, borderRadius: 10, padding: "16px 18px", position: "relative", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: color }} />
-      {icon && <div style={{ fontSize: 22, marginBottom: 8, opacity: 0.8 }}>{icon}</div>}
+      {icon && <div style={{ fontSize: 20, marginBottom: 6 }}>{icon}</div>}
       <div style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 900, color: T.testo, ...mono }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: color, fontWeight: 600, marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
-}
-
-// ── FILTRI ────────────────────────────────────────────────────
-function Filtri({ children, style }) {
-  return <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18, alignItems: "center", ...style }}>{children}</div>;
-}
-
-function Sel({ value, onChange, children, style }) {
-  return (
-    <select value={value} onChange={e => onChange(e.target.value)}
-      style={{ padding: "7px 11px", borderRadius: 6, border: `1px solid ${T.bordo}`, fontSize: 12, background: T.bianco, color: T.testo, boxShadow: "0 1px 2px rgba(0,0,0,0.04)", ...style }}>
-      {children}
-    </select>
-  );
-}
-
-function SearchInput({ value, onChange, placeholder }) {
-  return (
-    <div style={{ position: "relative" }}>
-      <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.muted, fontSize: 13, pointerEvents: "none" }}>🔍</span>
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder || "Cerca..."}
-        style={{ padding: "7px 12px 7px 32px", borderRadius: 6, border: `1px solid ${T.bordo}`, fontSize: 12, width: 220, outline: "none", background: T.bianco, boxShadow: "0 1px 2px rgba(0,0,0,0.04)", color: T.testo }} />
+      <div style={{ fontSize: 22, fontWeight: 900, color: T.testo, ...mono }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: T.sub, fontWeight: 600, marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
@@ -450,193 +494,157 @@ function Dashboard() {
 
   if (loading) return <div style={{ padding: 48, color: T.muted }}>Caricamento…</div>;
 
+  const ambiti = [
+    { label: "Teatro", value: 87525820, color: "#B91C1C" },
+    { label: "Musica", value: 45500848, color: "#6D28D9" },
+    { label: "Danza", value: 19383024, color: "#1D4ED8" },
+    { label: "Multidisciplinare", value: 16733464, color: "#047857" },
+    { label: "Circo", value: 9296751, color: "#B45309" },
+    { label: "Reg. Puglia", value: 7962128, color: "#C2410C" },
+  ];
+  const maxVal = Math.max(...ambiti.map(a => a.value));
+
   return (
     <div>
-      {/* Hero */}
-      <div style={{ background: `linear-gradient(135deg, ${T.inchiostro} 0%, #1E3A6E 100%)`, padding: "28px 36px", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", right: -60, top: -60, width: 250, height: 250, borderRadius: "50%", background: "rgba(196,154,0,0.06)" }} />
-        <div style={{ position: "absolute", right: 100, bottom: -80, width: 180, height: 180, borderRadius: "50%", background: "rgba(196,154,0,0.04)" }} />
+      <div style={{ background: "linear-gradient(135deg,#0A1628 0%,#1E3A8A 60%,#0A1628 100%)", padding: "26px 36px", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -60, top: -60, width: 250, height: 250, borderRadius: "50%", background: "rgba(196,154,0,0.07)" }} />
+        <div style={{ position: "absolute", left: -30, bottom: -50, width: 180, height: 180, borderRadius: "50%", background: "rgba(109,40,217,0.06)" }} />
         <div style={{ position: "relative" }}>
-          <div style={{ fontSize: 9, color: T.oro, ...mono, letterSpacing: 3, textTransform: "uppercase", marginBottom: 10, opacity: 0.9 }}>AGIS Puglia e Basilicata · MIC / FNSV / Regione Puglia</div>
-          <div style={{ fontSize: 24, fontWeight: 900, color: T.bianco, marginBottom: 4 }}>Gestionale Contributi Spettacolo dal Vivo</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>Fondo Nazionale per lo Spettacolo dal Vivo · POC Puglia 2021-2027 · Triennio 2025/2027</div>
+          <h1 style={{ fontSize: 26, fontWeight: 900, color: "#FFFFFF", margin: 0 }}>Dashboard <span style={{ color: "#F0C040" }}>2025/2026</span></h1>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "5px 0 0" }}>MIC · FNSV · Regione Puglia · Triennio 2025/2027</p>
         </div>
       </div>
 
-      <div style={{ padding: "28px 36px" }}>
-        {/* KPI */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 28 }}>
-          <KpiCard label="Organismi censiti" value={stats.org} color={T.marino} icon="🏛" />
-          <KpiCard label="Decreti importati" value={stats.dec} sub={`${stats.ass} assegnazioni`} color={T.oro} icon="📋" />
-          <KpiCard label="Contributi MIC 2025" value={fmt(stats.mic25)} color={T.verde} icon="💶" />
-          <KpiCard label="Contributi MIC 2026" value={fmt(stats.mic26)} color={T.viola} icon="💶" />
+      <div style={{ padding: "22px 36px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 20 }}>
+          {[
+            { label: "Organismi", value: stats.org.toLocaleString("it-IT"), sub: "censiti", bg: "linear-gradient(135deg,#1D4ED8,#3B82F6)", icon: "🏛" },
+            { label: "Decreti", value: stats.dec, sub: `${stats.ass.toLocaleString("it-IT")} assegnazioni`, bg: "linear-gradient(135deg,#6D28D9,#8B5CF6)", icon: "📋" },
+            { label: "MIC 2025", value: fmt(stats.mic25), sub: "Tutti gli ambiti", bg: "linear-gradient(135deg,#047857,#10B981)", icon: "💶" },
+            { label: "MIC 2026", value: fmt(stats.mic26), sub: "Parziale", bg: "linear-gradient(135deg,#B45309,#F59E0B)", icon: "💶" },
+            { label: "Reg. Puglia", value: "8,0M €", sub: "POC 2021-2027/anno", bg: "linear-gradient(135deg,#C2410C,#F97316)", icon: "🏛" },
+          ].map((k, i) => (
+            <div key={i} style={{ background: k.bg, borderRadius: 12, padding: "16px 16px", boxShadow: "0 2px 10px rgba(0,0,0,0.12)", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", right: -8, bottom: -8, fontSize: 50, opacity: 0.12, lineHeight: 1 }}>{k.icon}</div>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, marginBottom: 8 }}>{k.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#FFFFFF", ...mono, marginBottom: 4 }}>{k.value}</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", fontWeight: 500 }}>{k.sub}</div>
+            </div>
+          ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-          {/* Decreti */}
-          <div style={{ background: T.bianco, border: `1px solid ${T.bordo}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.bordo}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: T.sfondo }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: T.testo }}>Decreti importati</span>
-              <span style={{ fontSize: 10, color: T.muted, ...mono }}>{stats.dec} totali</span>
-            </div>
-            {stats.decreti.map(d => (
-              <div key={d.id} style={{ padding: "11px 18px", borderBottom: `1px solid ${T.bordo}`, display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ background: T.inchiostro, color: T.bianco, borderRadius: 5, padding: "3px 9px", fontSize: 11, fontFamily: "monospace", fontWeight: 800, flexShrink: 0 }}>{d.numero_rep?.slice(0,10)}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: T.testo, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.ambito?.nome}</div>
-                  <div style={{ fontSize: 10, color: T.muted }}>Anno {d.anno_finanziario} · {d.data} · <BadgeTipo tipo={d.tipo} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div style={{ background: T.bianco, borderRadius: 12, padding: "18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.testo, marginBottom: 14 }}>📊 Contributi per ambito (2025)</div>
+            {ambiti.map(a => (
+              <div key={a.label} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                  <span style={{ color: T.sub, fontWeight: 600 }}>{a.label}</span>
+                  <span style={{ ...mono, fontWeight: 800, color: "#0F172A" }}>{fmt(a.value)}</span>
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: T.verde, ...mono, whiteSpace: "nowrap" }}>{fmt(d.stanziamento_totale)}</div>
+                <div style={{ height: 8, background: "#E2E8F0", borderRadius: 4 }}>
+                  <div style={{ width: `${(a.value/maxVal)*100}%`, height: "100%", background: a.color, borderRadius: 4 }} />
+                </div>
               </div>
             ))}
           </div>
 
-          {/* Copertura */}
-          <div style={{ background: T.bianco, border: `1px solid ${T.bordo}`, borderRadius: 10, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.testo, marginBottom: 14 }}>Copertura dati</div>
+          <div style={{ background: T.bianco, borderRadius: 12, padding: "18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.testo, marginBottom: 12 }}>✓ Copertura dati</div>
             {[
-              { label: "Danza 2025/2026", rep: "1074/787", ok: true, tipo: "MIC_FNSV" },
-              { label: "Circo e Spett. Viaggiante 2025/2026", rep: "1137/770", ok: true, tipo: "MIC_FNSV" },
-              { label: "Multidisciplinare 2025/2026", rep: "1173/783", ok: true, tipo: "MIC_FNSV" },
-              { label: "Musica 2025", rep: "1125", ok: true, tipo: "MIC_FNSV" },
-              { label: "Teatro 2025", rep: "1291", ok: true, tipo: "MIC_FNSV" },
-              { label: "Regione Puglia FNSV 2025-2027", rep: "429", ok: true, tipo: "REG_PU" },
+              { label: "Danza 2025/2026", ok: true, rep: "1074/787", tipo: "MIC_FNSV" },
+              { label: "Circo 2025/2026", ok: true, rep: "1137/770", tipo: "MIC_FNSV" },
+              { label: "Multidisciplinare 2025/2026", ok: true, rep: "1173/783", tipo: "MIC_FNSV" },
+              { label: "Musica 2025", ok: true, rep: "1125", tipo: "MIC_FNSV" },
+              { label: "Teatro 2025", ok: true, rep: "1291", tipo: "MIC_FNSV" },
+              { label: "Regione Puglia 2025-2027", ok: true, rep: "429", tipo: "REG_PU" },
               { label: "Musica 2026", ok: false },
               { label: "Teatro 2026", ok: false },
             ].map(r => (
-              <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7, padding: "8px 12px", background: r.ok ? T.verdeChi : T.sfondo, borderRadius: 6, border: `1px solid ${r.ok ? T.verde+"25" : T.bordo}` }}>
-                <span style={{ color: r.ok ? T.verde : T.muted, fontSize: 13, flexShrink: 0 }}>{r.ok ? "✓" : "○"}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: r.ok ? 600 : 400, color: r.ok ? T.testo : T.muted }}>{r.label}</div>
-                  {r.ok && <div style={{ fontSize: 10, color: T.muted, display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                    <span style={{ ...mono }}>rep. {r.rep}</span>
-                    {r.tipo && <BadgeTipo tipo={r.tipo} />}
-                  </div>}
+              <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7, padding: "6px 10px", borderRadius: 6, background: r.ok ? "#ECFDF5" : T.sfondo, border: `1px solid ${r.ok ? "#6EE7B7" : T.bordo}` }}>
+                <span style={{ fontSize: 12, flexShrink: 0 }}>{r.ok ? "✅" : "⏳"}</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: r.ok ? "#065F46" : T.muted }}>{r.label}</div>
+                  {r.ok && r.rep && (
+                    <div style={{ fontSize: 10, color: T.sub, display: "flex", gap: 6, marginTop: 1, alignItems: "center" }}>
+                      <span style={{ ...mono, fontWeight: 600 }}>rep. {r.rep}</span>
+                      <BadgeTipo tipo={r.tipo} />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </div>
+
+        <div style={{ background: "linear-gradient(135deg,#0A1628,#1E3A5F)", borderRadius: 12, padding: "18px 24px", display: "flex", gap: 20, alignItems: "center", boxShadow: "0 4px 16px rgba(10,22,40,0.2)" }}>
+          <div style={{ fontSize: 28 }}>🎭</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, color: "#F0C040", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700, marginBottom: 3 }}>Focus Puglia e Basilicata</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>Organismi finanziati MIC/FNSV e Regione Puglia</div>
+          </div>
+          {[["Puglia MIC 2025","2,0M €","#F0C040"],["Puglia MIC 2026","1,9M €","#93C5FD"],["Reg. Puglia","8,0M €","#FCA5A5"],["Basilicata","0,2M €","#6EE7B7"]].map(([l,v,c]) => (
+            <div key={l} style={{ textAlign: "center", padding: "10px 14px", background: "rgba(255,255,255,0.07)", borderRadius: 8 }}>
+              <div style={{ fontSize: 17, fontWeight: 900, color: c, ...mono }}>{v}</div>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.45)", marginTop: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>{l}</div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  );
-}
-
-// ── HOOK DATI ─────────────────────────────────────────────────
-function useDati(filtriExtra) {
-  const [dati, setDati] = useState([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let q = supabase.schema("contributi_mic").from("v_assegnazioni").select("*");
-    if (filtriExtra?.regioni) q = q.in("regione", filtriExtra.regioni);
-    q.order("anno", { ascending: false }).order("contributo_assegnato", { ascending: false }).limit(1000)
-      .then(({ data }) => { setDati(data || []); setLoading(false); });
-  }, []);
-  return { dati, loading };
-}
-
-// ── ASSEGNAZIONI ──────────────────────────────────────────────
-function Assegnazioni() {
-  const { dati, loading } = useDati();
-  const [filtroAnno, setFiltroAnno] = useState("tutti");
-  const [filtroAmbito, setFiltroAmbito] = useState("tutti");
-  const [filtroFonte, setFiltroFonte] = useState("tutti");
-  const [cerca, setCerca] = useState("");
-  const [selected, setSelected] = useState(null);
-
-  const anni = ["tutti", ...new Set(dati.map(d => d.anno).sort().reverse())];
-  const ambiti = ["tutti", ...new Set(dati.map(d => d.ambito).filter(Boolean).sort())];
-
-  const filtrati = dati.filter(d =>
-    (filtroAnno === "tutti" || d.anno === parseInt(filtroAnno)) &&
-    (filtroAmbito === "tutti" || d.ambito === filtroAmbito) &&
-    (filtroFonte === "tutti" || d.tipo_decreto === filtroFonte) &&
-    (!cerca || d.denominazione?.toLowerCase().includes(cerca.toLowerCase()) ||
-               d.comune?.toLowerCase().includes(cerca.toLowerCase()) ||
-               d.codice_fiscale?.includes(cerca))
-  );
-  const totale = filtrati.reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
-
-  if (loading) return <div style={{ padding: 48, color: T.muted }}>Caricamento…</div>;
-
-  return (
-    <div style={{ padding: "28px 36px" }}>
-      {selected && <ModalOrganismo riga={selected} onClose={() => setSelected(null)} />}
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 900, color: T.testo, margin: 0 }}>Assegnazioni</h1>
-        <p style={{ fontSize: 12, color: T.muted, margin: "5px 0 0" }}>{filtrati.length} risultati · {fmt(totale)} · <em>Clicca colonna per ordinare · Clicca riga per dettaglio</em></p>
-      </div>
-      <Filtri>
-        <SearchInput value={cerca} onChange={setCerca} placeholder="Cerca organismo, comune, CF…" />
-        <Sel value={filtroAnno} onChange={setFiltroAnno}>{anni.map(a => <option key={a}>{a}</option>)}</Sel>
-        <Sel value={filtroAmbito} onChange={setFiltroAmbito}>{ambiti.map(a => <option key={a}>{a}</option>)}</Sel>
-        <Sel value={filtroFonte} onChange={setFiltroFonte}>
-          <option value="tutti">Tutte le fonti</option>
-          <option value="MIC_FNSV">MIC · FNSV</option>
-          <option value="REG_PU">Regione Puglia</option>
-        </Sel>
-      </Filtri>
-      <TabellaAssegnazioni dati={filtrati.slice(0, 600)} onSelectRiga={setSelected} mostraSottoinsieme={true} />
-      {filtrati.length > 600 && <div style={{ padding: "10px", fontSize: 11, color: T.muted, textAlign: "center", marginTop: 8 }}>Mostrati 600 di {filtrati.length} — usa i filtri</div>}
     </div>
   );
 }
 
 // ── PUGLIA & BASILICATA ───────────────────────────────────────
 function PugliaBasilicata() {
-  const { dati, loading } = useDati({ regioni: ["Puglia", "Basilicata"] });
-  const [filtroAnno, setFiltroAnno] = useState("tutti");
-  const [filtroRegione, setFiltroRegione] = useState("tutti");
-  const [filtroAmbito, setFiltroAmbito] = useState("tutti");
-  const [filtroFonte, setFiltroFonte] = useState("tutti");
-  const [cerca, setCerca] = useState("");
+  const { organismi, loading } = useOrganismi({ regioni: ["Puglia", "Basilicata"] });
   const [selected, setSelected] = useState(null);
 
-  const anni = ["tutti", ...new Set(dati.map(d => d.anno).sort().reverse())];
-  const ambiti = ["tutti", ...new Set(dati.map(d => d.ambito).filter(Boolean).sort())];
-
-  const filtrati = dati.filter(d =>
-    (filtroAnno === "tutti" || d.anno === parseInt(filtroAnno)) &&
-    (filtroRegione === "tutti" || d.regione === filtroRegione) &&
-    (filtroAmbito === "tutti" || d.ambito === filtroAmbito) &&
-    (filtroFonte === "tutti" || d.tipo_decreto === filtroFonte) &&
-    (!cerca || d.denominazione?.toLowerCase().includes(cerca.toLowerCase()) ||
-               d.comune?.toLowerCase().includes(cerca.toLowerCase()))
-  );
-
-  const totPU = filtrati.filter(d => d.regione === "Puglia" && d.tipo_decreto === "MIC_FNSV").reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
-  const totBA = filtrati.filter(d => d.regione === "Basilicata").reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
-  const totRegPU = filtrati.filter(d => d.tipo_decreto === "REG_PU" && d.anno === 2025).reduce((s, d) => s + (d.contributo_assegnato || 0), 0);
+  const totPU = organismi.filter(o => o.regione === "Puglia").reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "MIC_FNSV").reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
+  const totBA = organismi.filter(o => o.regione === "Basilicata").reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "MIC_FNSV").reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
+  const totRegPU = organismi.filter(o => o.fonti.includes("REG_PU")).reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "REG_PU" && a.anno === 2025).reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
 
   if (loading) return <div style={{ padding: 48, color: T.muted }}>Caricamento…</div>;
 
   return (
-    <div style={{ padding: "28px 36px" }}>
-      {selected && <ModalOrganismo riga={selected} onClose={() => setSelected(null)} />}
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 900, color: T.testo, margin: 0 }}>Puglia e Basilicata</h1>
-        <p style={{ fontSize: 12, color: T.muted, margin: "5px 0 0" }}>Contributi MIC/FNSV e Regione Puglia · Clicca colonna per ordinare · Clicca riga per dettaglio</p>
+    <div>
+      {selected && <SchedaOrganismo org={selected} onClose={() => setSelected(null)} />}
+
+      <div style={{ background: "linear-gradient(135deg,#7C2D12,#C2410C,#EA580C)", padding: "24px 36px", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -40, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
+        <div style={{ position: "relative" }}>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>AGIS · Focus Regionale</div>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: "#FFFFFF", margin: "0 0 6px" }}>Puglia <span style={{ color: "#FED7AA" }}>&</span> Basilicata</h1>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", margin: 0 }}>Contributi MIC/FNSV e Regione Puglia · {organismi.length} organismi</p>
+        </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 22 }}>
-        <KpiCard label="Puglia — MIC/FNSV" value={fmt(totPU)} color={T.oro} icon="🎭" />
-        <KpiCard label="Basilicata — MIC/FNSV" value={fmt(totBA)} color={T.verde} icon="🎭" />
-        <KpiCard label="Regione Puglia (ann.)" value={fmt(totRegPU)} color={T.arancio} icon="🏛" />
-        <KpiCard label="Risultati filtrati" value={filtrati.length} sub="assegnazioni" color={T.marino} icon="≡" />
+
+      <div style={{ padding: "22px 36px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 22 }}>
+          <div style={{ background: "#FEF9C3", border: "1px solid #FCD34D", borderTop: `3px solid #92400E`, borderRadius: 10, padding: "16px 18px" }}>
+            <div style={{ fontSize: 10, color: "#78350F", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>🎭 Puglia — MIC/FNSV</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#0F172A", ...mono }}>{fmt(totPU)}</div>
+            <div style={{ fontSize: 11, color: T.sub, fontWeight: 600, marginTop: 3 }}>{organismi.filter(o=>o.regione==="Puglia").length} organismi</div>
+          </div>
+          <div style={{ background: "#D1FAE5", border: "1px solid #6EE7B7", borderTop: `3px solid #065F46`, borderRadius: 10, padding: "16px 18px" }}>
+            <div style={{ fontSize: 10, color: "#064E3B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>🎭 Basilicata — MIC/FNSV</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#0F172A", ...mono }}>{fmt(totBA)}</div>
+            <div style={{ fontSize: 11, color: T.sub, fontWeight: 600, marginTop: 3 }}>{organismi.filter(o=>o.regione==="Basilicata").length} organismi</div>
+          </div>
+          <div style={{ background: "#FFEDD5", border: "1px solid #FCA5A5", borderTop: `3px solid #C2410C`, borderRadius: 10, padding: "16px 18px" }}>
+            <div style={{ fontSize: 10, color: "#7C2D12", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>🏛 Regione Puglia (annuale)</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#0F172A", ...mono }}>{fmt(totRegPU)}</div>
+            <div style={{ fontSize: 11, color: T.sub, fontWeight: 600, marginTop: 3 }}>POC 2021-2027</div>
+          </div>
+          <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderTop: `3px solid #1D4ED8`, borderRadius: 10, padding: "16px 18px" }}>
+            <div style={{ fontSize: 10, color: "#1E3A8A", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>≡ Totale cumulato</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#0F172A", ...mono }}>{fmt(totPU + totBA + totRegPU)}</div>
+            <div style={{ fontSize: 11, color: T.sub, fontWeight: 600, marginTop: 3 }}>{organismi.length} organismi unici</div>
+          </div>
+        </div>
+
+        <Organismi filtroRegionePre={["Puglia", "Basilicata"]} />
       </div>
-      <Filtri>
-        <SearchInput value={cerca} onChange={setCerca} placeholder="Cerca organismo o comune…" />
-        <Sel value={filtroAnno} onChange={setFiltroAnno}>{anni.map(a => <option key={a}>{a}</option>)}</Sel>
-        <Sel value={filtroRegione} onChange={setFiltroRegione}>
-          <option>tutti</option><option>Puglia</option><option>Basilicata</option>
-        </Sel>
-        <Sel value={filtroAmbito} onChange={setFiltroAmbito}>{ambiti.map(a => <option key={a}>{a}</option>)}</Sel>
-        <Sel value={filtroFonte} onChange={setFiltroFonte}>
-          <option value="tutti">Tutte le fonti</option>
-          <option value="MIC_FNSV">MIC · FNSV</option>
-          <option value="REG_PU">Regione Puglia</option>
-        </Sel>
-      </Filtri>
-      <TabellaAssegnazioni dati={filtrati} onSelectRiga={setSelected} mostraPunteggi={true} mostraSottoinsieme={true} />
     </div>
   );
 }
@@ -649,6 +657,7 @@ function Decreti() {
   const [assegnazioni, setAssegnazioni] = useState([]);
   const [loadingAss, setLoadingAss] = useState(false);
   const [selected, setSelected] = useState(null);
+  const { organismi } = useOrganismi();
 
   useEffect(() => {
     supabase.schema("contributi_mic").from("decreti").select("*, ambito:ambito_id(nome)").order("anno_finanziario", { ascending: false }).order("data", { ascending: false })
@@ -662,7 +671,20 @@ function Decreti() {
     const { data } = await supabase.schema("contributi_mic").from("v_assegnazioni").select("*")
       .eq("numero_rep", d.numero_rep).eq("anno", d.anno_finanziario)
       .order("contributo_assegnato", { ascending: false });
-    setAssegnazioni(data || []);
+    // Aggrega per organismo
+    const map = {};
+    for (const a of (data || [])) {
+      const key = a.id_organismo;
+      if (!map[key]) {
+        map[key] = { ...a, id: key, ambiti: new Set(), anni: new Set(), fonti: new Set(), totale: 0, assegnazioni: [] };
+      }
+      map[key].ambiti.add(a.ambito);
+      map[key].anni.add(a.anno);
+      map[key].fonti.add(a.tipo_decreto);
+      map[key].totale += a.contributo_assegnato || 0;
+      map[key].assegnazioni.push(a);
+    }
+    setAssegnazioni(Object.values(map).map(o => ({ ...o, ambiti: [...o.ambiti], anni: [...o.anni], fonti: [...o.fonti] })));
     setLoadingAss(false);
   }
 
@@ -670,19 +692,18 @@ function Decreti() {
 
   return (
     <div style={{ padding: "28px 36px" }}>
-      {selected && <ModalOrganismo riga={selected} onClose={() => setSelected(null)} />}
+      {selected && <SchedaOrganismo org={selected} onClose={() => setSelected(null)} />}
       <div style={{ marginBottom: 22 }}>
         <h1 style={{ fontSize: 22, fontWeight: 900, color: T.testo, margin: 0 }}>Decreti importati</h1>
-        <p style={{ fontSize: 12, color: T.muted, margin: "5px 0 0" }}>Clicca un decreto per vedere le assegnazioni</p>
+        <p style={{ fontSize: 12, color: T.muted, margin: "5px 0 0" }}>Clicca un decreto per vedere gli organismi finanziati</p>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {dati.map(d => (
           <div key={d.id}>
-            <div onClick={() => apriDecreto(d)}
-              style={{ background: T.bianco, border: `1px solid ${decretoSel?.id === d.id ? T.marino : T.bordo}`, borderLeft: `4px solid ${T.oro}`, borderRadius: 8, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", transition: "border-color 0.15s" }}>
-              <div style={{ background: T.inchiostro, color: T.bianco, borderRadius: 6, padding: "8px 14px", textAlign: "center", flexShrink: 0, ...mono }}>
-                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", letterSpacing: 1 }}>REP.</div>
-                <div style={{ fontSize: 20, fontWeight: 900, lineHeight: 1 }}>{d.numero_rep?.slice(0,10)}</div>
+            <div onClick={() => apriDecreto(d)} style={{ background: T.bianco, border: `1px solid ${decretoSel?.id === d.id ? T.marino : T.bordo}`, borderLeft: `4px solid ${T.oro}`, borderRadius: 8, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", transition: "border-color 0.15s" }}>
+              <div style={{ background: T.inchiostro, color: "#FFFFFF", borderRadius: 6, padding: "8px 14px", textAlign: "center", flexShrink: 0, ...mono }}>
+                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>REP.</div>
+                <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1 }}>{d.numero_rep?.slice(0,10)}</div>
                 <div style={{ fontSize: 9, color: T.oro, marginTop: 2 }}>{d.anno_finanziario}</div>
               </div>
               <div style={{ flex: 1 }}>
@@ -690,16 +711,15 @@ function Decreti() {
                   <span style={{ fontWeight: 700, fontSize: 14, color: T.testo }}>{d.ambito?.nome}</span>
                   <BadgeTipo tipo={d.tipo} />
                 </div>
-                <div style={{ fontSize: 11, color: T.muted }}>{d.ente_erogante} · {d.data}</div>
+                <div style={{ fontSize: 11, color: T.sub, fontWeight: 500 }}>{d.ente_erogante} · {d.data}</div>
               </div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: T.verde, ...mono }}>{fmt(d.stanziamento_totale)}</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#065F46", ...mono }}>{fmt(d.stanziamento_totale)}</div>
               <div style={{ fontSize: 16, color: T.muted, marginLeft: 8 }}>{decretoSel?.id === d.id ? "▲" : "▼"}</div>
             </div>
             {decretoSel?.id === d.id && (
-              <div style={{ border: `1px solid ${T.bordo}`, borderTop: "none", borderRadius: "0 0 8px 8px", background: T.sfondo }}>
-                {loadingAss
-                  ? <div style={{ padding: 20, color: T.muted, fontStyle: "italic" }}>Caricamento…</div>
-                  : <TabellaAssegnazioni dati={assegnazioni} onSelectRiga={setSelected} mostraSottoinsieme={true} />
+              <div style={{ border: `1px solid ${T.bordo}`, borderTop: "none", borderRadius: "0 0 8px 8px", background: T.sfondo, padding: 16 }}>
+                {loadingAss ? <div style={{ padding: 20, color: T.muted }}>Caricamento…</div> :
+                  <TabellaOrganismi organismi={assegnazioni} onSelect={setSelected} />
                 }
               </div>
             )}
@@ -715,11 +735,12 @@ export default function App() {
   const [sezione, setSezione] = useState("dashboard");
   const contenuto = {
     dashboard:         <Dashboard />,
-    assegnazioni:      <Assegnazioni />,
+    organismi:         <div style={{ padding: "22px 36px" }}><div style={{ marginBottom: 18 }}><h1 style={{ fontSize: 22, fontWeight: 900, color: T.testo, margin: 0 }}>Organismi</h1><p style={{ fontSize: 12, color: T.muted, margin: "4px 0 0" }}>Anagrafica completa · Clicca un organismo per vedere tutte le sue assegnazioni</p></div><Organismi /></div>,
     puglia_basilicata: <PugliaBasilicata />,
     decreti:           <Decreti />,
     parser:            <ParserDecreto />,
   }[sezione];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Segoe UI', system-ui, sans-serif", background: T.sfondo }}>
       <Topbar sezione={sezione} setSezione={setSezione} />
