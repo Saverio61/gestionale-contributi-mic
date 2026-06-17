@@ -375,9 +375,20 @@ function useOrganismi(filtriExtra) {
 
   useEffect(() => {
     async function load() {
-      let q = supabase.schema("contributi_mic").from("v_assegnazioni").select("*");
-      if (filtriExtra?.regioni) q = q.in("regione", filtriExtra.regioni);
-      const { data } = await q.order("denominazione");
+      // Supabase limita le query a 1000 righe di default: paginiamo per recuperare tutto
+      let allData = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        let q = supabase.schema("contributi_mic").from("v_assegnazioni").select("*");
+        if (filtriExtra?.regioni) q = q.in("regione", filtriExtra.regioni);
+        const { data, error } = await q.order("id_organismo").range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        allData = allData.concat(data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      const data = allData;
 
       // Aggrega per organismo
       const map = {};
@@ -522,15 +533,29 @@ function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: ass }, { data: org }, { data: dec }] = await Promise.all([
-        supabase.schema("contributi_mic").from("assegnazioni").select("contributo_assegnato, anno, organismo_id"),
-        supabase.schema("contributi_mic").from("organismi").select("id, comune_id"),
+      // Conteggi esatti (evitano il limite di 1000 righe di Supabase)
+      const [{ count: orgCount }, { count: conSedeCount }, { count: decCount }, { data: dec }] = await Promise.all([
+        supabase.schema("contributi_mic").from("organismi").select("id", { count: "exact", head: true }),
+        supabase.schema("contributi_mic").from("organismi").select("id", { count: "exact", head: true }).not("comune_id", "is", null),
+        supabase.schema("contributi_mic").from("decreti").select("id", { count: "exact", head: true }),
         supabase.schema("contributi_mic").from("decreti").select("*, ambito:ambito_id(nome)").order("anno_finanziario", { ascending: false }).order("data", { ascending: false }),
       ]);
-      const mic25 = (ass||[]).filter(a=>a.anno===2025).reduce((s,a)=>s+(a.contributo_assegnato||0),0);
-      const mic26 = (ass||[]).filter(a=>a.anno===2026).reduce((s,a)=>s+(a.contributo_assegnato||0),0);
-      const conSede = (org||[]).filter(o => o.comune_id).length;
-      setStats({ org: org?.length||0, conSede, dec: dec?.length||0, mic25, mic26, ass: ass?.length||0, decreti: dec||[] });
+
+      // Paginazione per i totali contributi (somma su tutte le assegnazioni)
+      let allAss = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await supabase.schema("contributi_mic").from("assegnazioni").select("contributo_assegnato, anno").range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        allAss = allAss.concat(data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+
+      const mic25 = allAss.filter(a=>a.anno===2025).reduce((s,a)=>s+(a.contributo_assegnato||0),0);
+      const mic26 = allAss.filter(a=>a.anno===2026).reduce((s,a)=>s+(a.contributo_assegnato||0),0);
+      setStats({ org: orgCount||0, conSede: conSedeCount||0, dec: decCount||0, mic25, mic26, ass: allAss.length, decreti: dec||[] });
       setLoading(false);
     }
     load();
