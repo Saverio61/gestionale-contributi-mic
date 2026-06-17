@@ -426,18 +426,30 @@ function useOrganismi(filtriExtra) {
 function Organismi({ filtroRegionePre }) {
   const { organismi, loading } = useOrganismi(filtroRegionePre ? { regioni: filtroRegionePre } : null);
   const [cerca, setCerca] = useState("");
+  const [cercaCF, setCercaCF] = useState("");
   const [filtroAmbito, setFiltroAmbito] = useState("tutti");
   const [filtroFonte, setFiltroFonte] = useState("tutti");
+  const [filtroRegione, setFiltroRegione] = useState("tutte");
+  const [filtroComune, setFiltroComune] = useState("tutti");
   const [selected, setSelected] = useState(null);
 
   const ambiti = ["tutti", ...new Set(organismi.flatMap(o => o.ambiti).filter(Boolean).sort())];
+  const regioni = ["tutte", ...new Set(organismi.map(o => o.regione).filter(Boolean).sort())];
+  const comuniDisponibili = ["tutti", ...new Set(
+    organismi
+      .filter(o => filtroRegione === "tutte" || o.regione === filtroRegione)
+      .map(o => o.comune)
+      .filter(Boolean)
+      .sort()
+  )];
 
   const filtrati = organismi.filter(o =>
-    (!cerca || o.denominazione?.toLowerCase().includes(cerca.toLowerCase()) ||
-               o.comune?.toLowerCase().includes(cerca.toLowerCase()) ||
-               (o.codice_fiscale || "").includes(cerca)) &&
+    (!cerca || o.denominazione?.toLowerCase().includes(cerca.toLowerCase())) &&
+    (!cercaCF || (o.codice_fiscale || "").toLowerCase().includes(cercaCF.toLowerCase())) &&
     (filtroAmbito === "tutti" || o.ambiti.includes(filtroAmbito)) &&
-    (filtroFonte === "tutti" || o.fonti.includes(filtroFonte))
+    (filtroFonte === "tutti" || o.fonti.includes(filtroFonte)) &&
+    (filtroRegione === "tutte" || o.regione === filtroRegione) &&
+    (filtroComune === "tutti" || o.comune === filtroComune)
   );
 
   const totale = filtrati.reduce((s, o) => s + o.totale, 0);
@@ -452,9 +464,20 @@ function Organismi({ filtroRegionePre }) {
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ position: "relative" }}>
           <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.muted, pointerEvents: "none" }}>🔍</span>
-          <input value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca organismo, comune, CF…"
-            style={{ ...sel, paddingLeft: 32, width: 250 }} />
+          <input value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca organismo…"
+            style={{ ...sel, paddingLeft: 32, width: 200 }} />
         </div>
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.muted, pointerEvents: "none", fontSize: 11, fontWeight: 700 }}>CF</span>
+          <input value={cercaCF} onChange={e => setCercaCF(e.target.value)} placeholder="Cerca per CF…"
+            style={{ ...sel, paddingLeft: 30, width: 150, ...mono }} />
+        </div>
+        <select value={filtroRegione} onChange={e => { setFiltroRegione(e.target.value); setFiltroComune("tutti"); }} style={sel}>
+          {regioni.map(r => <option key={r} value={r}>{r === "tutte" ? "Tutte le regioni" : r}</option>)}
+        </select>
+        <select value={filtroComune} onChange={e => setFiltroComune(e.target.value)} style={sel} disabled={comuniDisponibili.length <= 1}>
+          {comuniDisponibili.map(c => <option key={c} value={c}>{c === "tutti" ? "Tutti i comuni" : c}</option>)}
+        </select>
         <select value={filtroAmbito} onChange={e => setFiltroAmbito(e.target.value)} style={sel}>
           {ambiti.map(a => <option key={a}>{a}</option>)}
         </select>
@@ -463,6 +486,12 @@ function Organismi({ filtroRegionePre }) {
           <option value="MIC_FNSV">MIC · FNSV</option>
           <option value="REG_PU">Regione Puglia</option>
         </select>
+        {(cerca || cercaCF || filtroAmbito !== "tutti" || filtroFonte !== "tutti" || filtroRegione !== "tutte" || filtroComune !== "tutti") && (
+          <button onClick={() => { setCerca(""); setCercaCF(""); setFiltroAmbito("tutti"); setFiltroFonte("tutti"); setFiltroRegione("tutte"); setFiltroComune("tutti"); }}
+            style={{ ...sel, background: "#FEF2F2", color: "#B91C1C", border: "1px solid #FECACA", cursor: "pointer", fontWeight: 600 }}>
+            ✕ Pulisci filtri
+          </button>
+        )}
         <span style={{ fontSize: 12, color: T.sub, fontWeight: 600 }}>{filtrati.length} organismi · {fmt(totale)}</span>
       </div>
       <TabellaOrganismi organismi={filtrati} onSelect={setSelected} />
