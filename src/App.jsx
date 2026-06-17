@@ -472,21 +472,25 @@ function KpiCard({ label, value, sub, color, bg, icon }) {
   );
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────
+// ── DASHBOARD (stile istituzionale) ─────────────────────────
+const serif = { fontFamily: "Georgia, 'Times New Roman', serif" };
+
 function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hovDec, setHovDec] = useState(null);
 
   useEffect(() => {
     async function load() {
       const [{ data: ass }, { data: org }, { data: dec }] = await Promise.all([
-        supabase.schema("contributi_mic").from("assegnazioni").select("contributo_assegnato, anno"),
-        supabase.schema("contributi_mic").from("organismi").select("id"),
+        supabase.schema("contributi_mic").from("assegnazioni").select("contributo_assegnato, anno, organismo_id"),
+        supabase.schema("contributi_mic").from("organismi").select("id, comune_id"),
         supabase.schema("contributi_mic").from("decreti").select("*, ambito:ambito_id(nome)").order("anno_finanziario", { ascending: false }).order("data", { ascending: false }),
       ]);
       const mic25 = (ass||[]).filter(a=>a.anno===2025).reduce((s,a)=>s+(a.contributo_assegnato||0),0);
       const mic26 = (ass||[]).filter(a=>a.anno===2026).reduce((s,a)=>s+(a.contributo_assegnato||0),0);
-      setStats({ org: org?.length||0, dec: dec?.length||0, mic25, mic26, ass: ass?.length||0, decreti: dec||[] });
+      const conSede = (org||[]).filter(o => o.comune_id).length;
+      setStats({ org: org?.length||0, conSede, dec: dec?.length||0, mic25, mic26, ass: ass?.length||0, decreti: dec||[] });
       setLoading(false);
     }
     load();
@@ -495,100 +499,166 @@ function Dashboard() {
   if (loading) return <div style={{ padding: 48, color: T.muted }}>Caricamento…</div>;
 
   const ambiti = [
-    { label: "Teatro", value: 87525820, color: "#B91C1C" },
-    { label: "Musica", value: 45500848, color: "#6D28D9" },
-    { label: "Danza", value: 19383024, color: "#1D4ED8" },
-    { label: "Multidisciplinare", value: 16733464, color: "#047857" },
-    { label: "Circo", value: 9296751, color: "#B45309" },
-    { label: "Reg. Puglia", value: 7962128, color: "#C2410C" },
+    { label: "Teatro", value: 87525820, color: "#8B1A1A" },
+    { label: "Musica", value: 45500848, color: "#1A4A8A" },
+    { label: "Danza", value: 19383024, color: "#B8960C" },
+    { label: "Multidisciplinare", value: 16733464, color: "#2E7D52" },
+    { label: "Circo", value: 9296751, color: "#7A4F1A" },
+    { label: "Reg. Puglia", value: 7962128, color: "#5A1A6B" },
   ];
   const maxVal = Math.max(...ambiti.map(a => a.value));
+  const fmtM = (n) => (n / 1000000).toFixed(1) + "M €";
+  const PAL = { ink: "#0D1B2A", inkLight: "#1E3A5F", gold: "#B8960C", goldMid: "#D4AF37",
+    blue: "#1A4A8A", blueLight: "#E8EEF8", green: "#1A5C3A", border: "#DDE3EC", sub: "#3D5A7A" };
+
+  const decretiOrdinati = [...stats.decreti].sort((a,b) => (b.stanziamento_totale||0) - (a.stanziamento_totale||0));
 
   return (
     <div>
-      <div style={{ background: "linear-gradient(135deg,#0A1628 0%,#1E3A8A 60%,#0A1628 100%)", padding: "26px 36px", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", right: -60, top: -60, width: 250, height: 250, borderRadius: "50%", background: "rgba(196,154,0,0.07)" }} />
-        <div style={{ position: "absolute", left: -30, bottom: -50, width: 180, height: 180, borderRadius: "50%", background: "rgba(109,40,217,0.06)" }} />
-        <div style={{ position: "relative" }}>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: "#FFFFFF", margin: 0 }}>Dashboard <span style={{ color: "#F0C040" }}>2025/2026</span></h1>
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "5px 0 0" }}>MIC · FNSV · Regione Puglia · Triennio 2025/2027</p>
+      {/* HERO istituzionale */}
+      <div style={{ background: "linear-gradient(160deg, " + PAL.ink + " 0%, " + PAL.inkLight + " 100%)", padding: "32px 36px 28px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 10, color: PAL.goldMid, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>
+              Fondo Nazionale per lo Spettacolo dal Vivo · Triennio 2025/2027
+            </div>
+            <h1 style={{ fontSize: 28, fontWeight: 900, color: "#FFFFFF", margin: 0, lineHeight: 1.15, ...serif }}>
+              Contributi Spettacolo <span style={{ color: PAL.goldMid }}>dal Vivo</span>
+            </h1>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 8 }}>
+              MIC · FNSV · Regione Puglia — Annualità 2025 e 2026
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 2 }}>
+            {["MIC · FNSV", "Regione Puglia", "POC 2021-2027"].map(t => (
+              <span key={t} style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", padding: "5px 12px", fontSize: 10, fontWeight: 600, letterSpacing: 1, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 2 }}>{t}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* KPI strip */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginTop: 26 }}>
+          {[
+            { label: "Organismi censiti", value: stats.org.toLocaleString("it-IT"), sub: stats.conSede.toLocaleString("it-IT") + " con sede", accent: PAL.goldMid },
+            { label: "Decreti importati", value: stats.dec, sub: stats.ass.toLocaleString("it-IT") + " assegnazioni", accent: "#7BA7E0" },
+            { label: "Totale MIC 2025", value: fmtM(stats.mic25), sub: "Tutti gli ambiti", accent: "#7EE8A2" },
+            { label: "Totale MIC 2026", value: fmtM(stats.mic26), sub: "Parziale", accent: "#F0C040" },
+            { label: "Regione Puglia", value: "8,0M €", sub: "POC 2021-2027 / anno", accent: "#E08080" },
+          ].map((k, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderTop: "2px solid " + k.accent, borderRadius: 6, padding: "14px 16px" }}>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 700, marginBottom: 8 }}>{k.label}</div>
+              <div style={{ fontSize: 21, fontWeight: 900, color: "#FFFFFF", ...mono }}>{k.value}</div>
+              <div style={{ fontSize: 10, color: k.accent, marginTop: 4, fontWeight: 600 }}>{k.sub}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div style={{ padding: "22px 36px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 20 }}>
-          {[
-            { label: "Organismi", value: stats.org.toLocaleString("it-IT"), sub: "censiti", bg: "linear-gradient(135deg,#1D4ED8,#3B82F6)", icon: "🏛" },
-            { label: "Decreti", value: stats.dec, sub: `${stats.ass.toLocaleString("it-IT")} assegnazioni`, bg: "linear-gradient(135deg,#6D28D9,#8B5CF6)", icon: "📋" },
-            { label: "MIC 2025", value: fmt(stats.mic25), sub: "Tutti gli ambiti", bg: "linear-gradient(135deg,#047857,#10B981)", icon: "💶" },
-            { label: "MIC 2026", value: fmt(stats.mic26), sub: "Parziale", bg: "linear-gradient(135deg,#B45309,#F59E0B)", icon: "💶" },
-            { label: "Reg. Puglia", value: "8,0M €", sub: "POC 2021-2027/anno", bg: "linear-gradient(135deg,#C2410C,#F97316)", icon: "🏛" },
-          ].map((k, i) => (
-            <div key={i} style={{ background: k.bg, borderRadius: 12, padding: "16px 16px", boxShadow: "0 2px 10px rgba(0,0,0,0.12)", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", right: -8, bottom: -8, fontSize: 50, opacity: 0.12, lineHeight: 1 }}>{k.icon}</div>
-              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, marginBottom: 8 }}>{k.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: "#FFFFFF", ...mono, marginBottom: 4 }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", fontWeight: 500 }}>{k.sub}</div>
-            </div>
-          ))}
-        </div>
+      {/* CORPO */}
+      <div style={{ padding: "26px 36px", display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 18 }}>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-          <div style={{ background: T.bianco, borderRadius: 12, padding: "18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.testo, marginBottom: 14 }}>📊 Contributi per ambito (2025)</div>
-            {ambiti.map(a => (
-              <div key={a.label} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-                  <span style={{ color: T.sub, fontWeight: 600 }}>{a.label}</span>
-                  <span style={{ ...mono, fontWeight: 800, color: "#0F172A" }}>{fmt(a.value)}</span>
+        {/* COL SINISTRA */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          <div style={{ background: T.bianco, border: "1px solid " + PAL.border, borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: "1px solid " + PAL.border }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: 2 }}>Distribuzione contributi 2025</div>
+            </div>
+            <div style={{ padding: "16px 18px" }}>
+              {ambiti.map(a => (
+                <div key={a.label} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                    <span style={{ fontSize: 12, color: PAL.sub, fontWeight: 600 }}>{a.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: "#0F172A", ...mono }}>{fmt(a.value)}</span>
+                  </div>
+                  <div style={{ height: 6, background: PAL.border, borderRadius: 3 }}>
+                    <div style={{ width: ((a.value/maxVal)*100) + "%", height: "100%", background: a.color, borderRadius: 3 }} />
+                  </div>
                 </div>
-                <div style={{ height: 8, background: "#E2E8F0", borderRadius: 4 }}>
-                  <div style={{ width: `${(a.value/maxVal)*100}%`, height: "100%", background: a.color, borderRadius: 4 }} />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          <div style={{ background: T.bianco, borderRadius: 12, padding: "18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.testo, marginBottom: 12 }}>✓ Copertura dati</div>
-            {[
-              { label: "Danza 2025/2026", ok: true, rep: "1074/787", tipo: "MIC_FNSV" },
-              { label: "Circo 2025/2026", ok: true, rep: "1137/770", tipo: "MIC_FNSV" },
-              { label: "Multidisciplinare 2025/2026", ok: true, rep: "1173/783", tipo: "MIC_FNSV" },
-              { label: "Musica 2025", ok: true, rep: "1125", tipo: "MIC_FNSV" },
-              { label: "Teatro 2025", ok: true, rep: "1291", tipo: "MIC_FNSV" },
-              { label: "Regione Puglia 2025-2027", ok: true, rep: "429", tipo: "REG_PU" },
-              { label: "Musica 2026", ok: false },
-              { label: "Teatro 2026", ok: false },
-            ].map(r => (
-              <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7, padding: "6px 10px", borderRadius: 6, background: r.ok ? "#ECFDF5" : T.sfondo, border: `1px solid ${r.ok ? "#6EE7B7" : T.bordo}` }}>
-                <span style={{ fontSize: 12, flexShrink: 0 }}>{r.ok ? "✅" : "⏳"}</span>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: r.ok ? "#065F46" : T.muted }}>{r.label}</div>
-                  {r.ok && r.rep && (
-                    <div style={{ fontSize: 10, color: T.sub, display: "flex", gap: 6, marginTop: 1, alignItems: "center" }}>
-                      <span style={{ ...mono, fontWeight: 600 }}>rep. {r.rep}</span>
-                      <BadgeTipo tipo={r.tipo} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div style={{ background: T.bianco, border: "1px solid " + PAL.border, borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: "1px solid " + PAL.border }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: 2 }}>Decreti importati</div>
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: T.sfondo }}>
+                  {["Rep.","Decreto","Stanziamento","Fonte"].map(h => (
+                    <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 9, color: T.muted, textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, borderBottom: "1px solid " + PAL.border }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {decretiOrdinati.map((d, i) => (
+                  <tr key={d.id}
+                    onMouseEnter={() => setHovDec(i)} onMouseLeave={() => setHovDec(null)}
+                    style={{ background: hovDec === i ? PAL.blueLight : i % 2 === 0 ? T.bianco : T.sfondo, borderBottom: "1px solid " + PAL.border }}>
+                    <td style={{ padding: "9px 14px", ...mono, fontWeight: 800, color: PAL.blue, fontSize: 11 }}>{d.numero_rep}</td>
+                    <td style={{ padding: "9px 14px", fontSize: 12, fontWeight: 600, color: T.testo }}>{d.ambito?.nome} {d.anno_finanziario}</td>
+                    <td style={{ padding: "9px 14px", fontSize: 12, fontWeight: 700, color: PAL.green, ...mono }}>{fmtM(d.stanziamento_totale||0)}</td>
+                    <td style={{ padding: "9px 14px" }}><BadgeTipo tipo={d.tipo} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div style={{ background: "linear-gradient(135deg,#0A1628,#1E3A5F)", borderRadius: 12, padding: "18px 24px", display: "flex", gap: 20, alignItems: "center", boxShadow: "0 4px 16px rgba(10,22,40,0.2)" }}>
-          <div style={{ fontSize: 28 }}>🎭</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, color: "#F0C040", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700, marginBottom: 3 }}>Focus Puglia e Basilicata</div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>Organismi finanziati MIC/FNSV e Regione Puglia</div>
-          </div>
-          {[["Puglia MIC 2025","2,0M €","#F0C040"],["Puglia MIC 2026","1,9M €","#93C5FD"],["Reg. Puglia","8,0M €","#FCA5A5"],["Basilicata","0,2M €","#6EE7B7"]].map(([l,v,c]) => (
-            <div key={l} style={{ textAlign: "center", padding: "10px 14px", background: "rgba(255,255,255,0.07)", borderRadius: 8 }}>
-              <div style={{ fontSize: 17, fontWeight: 900, color: c, ...mono }}>{v}</div>
-              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.45)", marginTop: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>{l}</div>
+        {/* COL DESTRA */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          <div style={{ background: "linear-gradient(135deg, #2A0A00, #5C1A00)", border: "1px solid #7A3A00", borderRadius: 8, padding: "18px 20px" }}>
+            <div style={{ fontSize: 9, color: "#FCA97A", letterSpacing: 2.5, textTransform: "uppercase", fontWeight: 700, marginBottom: 12 }}>Focus · Puglia e Basilicata</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {[
+                { label: "Puglia MIC 2025", value: "2,0M €", color: "#FCD34D" },
+                { label: "Puglia MIC 2026", value: "1,9M €", color: "#93C5FD" },
+                { label: "Regione Puglia", value: "7,8M €", color: "#FCA5A5" },
+                { label: "Basilicata MIC", value: "0,2M €", color: "#86EFAC" },
+              ].map(k => (
+                <div key={k.label} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 6, padding: "11px 13px", borderLeft: "3px solid " + k.color }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 5, fontWeight: 600 }}>{k.label}</div>
+                  <div style={{ fontSize: 17, fontWeight: 900, color: k.color, ...mono }}>{k.value}</div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div style={{ background: T.bianco, border: "1px solid " + PAL.border, borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: "1px solid " + PAL.border }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: 2 }}>Copertura dati</div>
+            </div>
+            <div style={{ padding: "10px 18px" }}>
+              {[
+                { label: "Danza 2025/2026", ok: true },
+                { label: "Circo 2025/2026", ok: true },
+                { label: "Multidisciplinare 2025/2026", ok: true },
+                { label: "Musica 2025", ok: true },
+                { label: "Teatro 2025", ok: true },
+                { label: "Regione Puglia 2025-2027", ok: true },
+                { label: "Pratiche musicali periferie", ok: true },
+                { label: "Musica 2026", ok: false },
+                { label: "Teatro 2026", ok: false },
+              ].map(r => (
+                <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid " + PAL.border }}>
+                  <div style={{ width: 18, height: 18, borderRadius: "50%", background: r.ok ? PAL.green : PAL.border, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: 9, color: r.ok ? "#FFFFFF" : T.muted, fontWeight: 900 }}>{r.ok ? "✓" : "○"}</span>
+                  </div>
+                  <span style={{ fontSize: 12, color: r.ok ? T.testo : T.muted, fontWeight: r.ok ? 600 : 400 }}>{r.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: PAL.blueLight, border: "1px solid " + PAL.border, borderLeft: "3px solid " + PAL.blue, borderRadius: 6, padding: "13px 15px" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: PAL.blue, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Nota metodologica</div>
+            <div style={{ fontSize: 11, color: PAL.sub, lineHeight: 1.6 }}>
+              I contributi MIC 2026 sono parziali — mancano i decreti Musica e Teatro 2026. I dati Regione Puglia si riferiscono al 2025, con importo invariato su 2026/2027 salvo aggiornamenti.
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -614,7 +684,7 @@ function PugliaBasilicata() {
         <div style={{ position: "absolute", right: -40, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
         <div style={{ position: "relative" }}>
           <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>AGIS · Focus Regionale</div>
-          <h1 style={{ fontSize: 24, fontWeight: 900, color: "#FFFFFF", margin: "0 0 6px" }}>Puglia <span style={{ color: "#FED7AA" }}>&</span> Basilicata</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 900, color: "#FFFFFF", margin: "0 0 6px", ...serif }}>Puglia <span style={{ color: "#FED7AA" }}>&</span> Basilicata</h1>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", margin: 0 }}>Contributi MIC/FNSV e Regione Puglia · {organismi.length} organismi</p>
         </div>
       </div>
