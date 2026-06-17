@@ -295,23 +295,34 @@ function TabellaOrganismi({ organismi, onSelect }) {
     return sortDir === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
   });
 
-  const Th = ({ col, label, right }) => (
+  const Th = ({ col, label, right, width }) => (
     <th onClick={() => col && toggleSort(col)} style={{
-      padding: "10px 11px", textAlign: right ? "right" : "left",
+      padding: "9px 9px", textAlign: right ? "right" : "left",
       color: sortCol === col ? "#FFFFFF" : "rgba(255,255,255,0.65)",
-      fontSize: 10, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.6,
+      fontSize: 9, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.5,
       whiteSpace: "nowrap", cursor: col ? "pointer" : "default",
       background: sortCol === col ? "rgba(255,255,255,0.08)" : "transparent",
-      userSelect: "none",
+      userSelect: "none", width, minWidth: width,
     }}>
-      {label}{col && sortCol === col && <span style={{ marginLeft: 4 }}>{sortDir === "desc" ? "↓" : "↑"}</span>}
+      {label}{col && sortCol === col && <span style={{ marginLeft: 3 }}>{sortDir === "desc" ? "↓" : "↑"}</span>}
     </th>
   );
 
   return (
     <div style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${T.bordo}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 800 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: 190 }} />
+            <col style={{ width: 95 }} />
+            <col style={{ width: 110 }} />
+            <col style={{ width: 75 }} />
+            <col style={{ width: 130 }} />
+            <col style={{ width: 70 }} />
+            <col style={{ width: 80 }} />
+            <col style={{ width: 95 }} />
+            <col style={{ width: 18 }} />
+          </colgroup>
           <thead>
             <tr style={{ background: T.inchiostro }}>
               <Th col="denominazione" label="Organismo" />
@@ -322,7 +333,7 @@ function TabellaOrganismi({ organismi, onSelect }) {
               <Th label="Anni" />
               <Th label="Fonti" />
               <Th col="totale" label="Totale" right />
-              <th style={{ padding: "10px 8px", background: T.inchiostro, width: 20 }}></th>
+              <th style={{ padding: "9px 6px", background: T.inchiostro }}></th>
             </tr>
           </thead>
           <tbody>
@@ -331,21 +342,21 @@ function TabellaOrganismi({ organismi, onSelect }) {
               return (
                 <tr key={o.id} onClick={() => onSelect(o)}
                   style={{ background: isPugBas ? "#FFFBF0" : i % 2 === 0 ? T.bianco : T.sfondo, borderBottom: `1px solid ${T.bordo}`, cursor: "pointer" }}>
-                  <td style={{ padding: "10px 11px", fontWeight: 700, color: "#0F172A", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.denominazione}</td>
-                  <td style={{ padding: "10px 11px", ...mono, fontSize: 11, color: "#1E3A8A", fontWeight: 700 }}>{o.codice_fiscale || <span style={{ color: T.muted }}>—</span>}</td>
-                  <td style={{ padding: "10px 11px", fontSize: 11, color: o.comune ? "#374151" : "#DC2626", whiteSpace: "nowrap", fontWeight: 600 }}>
+                  <td style={{ padding: "7px 9px", fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={o.denominazione}>{o.denominazione}</td>
+                  <td style={{ padding: "7px 9px", ...mono, fontSize: 10, color: "#1E3A8A", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.codice_fiscale || <span style={{ color: T.muted }}>—</span>}</td>
+                  <td style={{ padding: "7px 9px", fontSize: 10, color: o.comune ? "#374151" : "#DC2626", whiteSpace: "nowrap", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }} title={o.comune ? `${o.comune} (${o.sigla_provincia})` : ""}>
                     {o.comune ? `${o.comune} (${o.sigla_provincia})` : "⚠ mancante"}
                   </td>
-                  <td style={{ padding: "10px 11px" }}><BadgeRegione regione={o.regione} /></td>
-                  <td style={{ padding: "10px 11px" }}>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{o.ambiti.map(a => <BadgeAmbito key={a} ambito={a} />)}</div>
+                  <td style={{ padding: "7px 9px", overflow: "hidden" }}><BadgeRegione regione={o.regione} /></td>
+                  <td style={{ padding: "7px 9px", overflow: "hidden", whiteSpace: "nowrap" }}>
+                    <div style={{ display: "flex", gap: 3, overflow: "hidden" }}>{o.ambiti.slice(0,2).map(a => <BadgeAmbito key={a} ambito={a} />)}{o.ambiti.length > 2 && <span style={{ fontSize: 9, color: T.muted, alignSelf: "center" }}>+{o.ambiti.length-2}</span>}</div>
                   </td>
-                  <td style={{ padding: "10px 11px", ...mono, color: "#374151", fontWeight: 700, fontSize: 11 }}>{o.anni.join(", ")}</td>
-                  <td style={{ padding: "10px 11px" }}>
-                    <div style={{ display: "flex", gap: 4 }}>{o.fonti.map(f => <BadgeTipo key={f} tipo={f} />)}</div>
+                  <td style={{ padding: "7px 9px", ...mono, color: "#374151", fontWeight: 700, fontSize: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={o.anni.join(", ")}>{o.anni.join(",")}</td>
+                  <td style={{ padding: "7px 9px", overflow: "hidden", whiteSpace: "nowrap" }}>
+                    <div style={{ display: "flex", gap: 3 }}>{o.fonti.slice(0,1).map(f => <BadgeTipo key={f} tipo={f} />)}{o.fonti.length > 1 && <span style={{ fontSize: 9, color: T.muted, alignSelf: "center" }}>+{o.fonti.length-1}</span>}</div>
                   </td>
-                  <td style={{ padding: "10px 11px", fontWeight: 800, color: "#065F46", ...mono, textAlign: "right", fontSize: 13 }}>{fmt(o.totale)}</td>
-                  <td style={{ padding: "10px 8px", color: "#94A3B8", fontSize: 16, textAlign: "center" }}>›</td>
+                  <td style={{ padding: "7px 9px", fontWeight: 800, color: "#065F46", ...mono, textAlign: "right", fontSize: 12, whiteSpace: "nowrap" }}>{fmt(o.totale)}</td>
+                  <td style={{ padding: "7px 6px", color: "#94A3B8", fontSize: 14, textAlign: "center" }}>›</td>
                 </tr>
               );
             })}
