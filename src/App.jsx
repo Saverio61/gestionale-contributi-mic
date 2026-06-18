@@ -112,9 +112,16 @@ function FormSede({ organismo_id, onSaved }) {
   async function salva() {
     if (!comuneSel) return;
     setSaving(true);
-    const { error } = await supabase.schema("contributi_mic").from("organismi").update({ comune_id: parseInt(comuneSel) }).eq("id", organismo_id);
+    const idNum = parseInt(organismo_id);
+    const comuneNum = parseInt(comuneSel);
+    if (!idNum || !comuneNum) { setMsg("Errore: ID non valido (" + organismo_id + ")"); setSaving(false); return; }
+    const { data, error, count } = await supabase.schema("contributi_mic").from("organismi")
+      .update({ comune_id: comuneNum })
+      .eq("id", idNum)
+      .select();
     setSaving(false);
     if (error) setMsg("Errore: " + error.message);
+    else if (!data || data.length === 0) setMsg("⚠ Nessuna riga aggiornata (id=" + idNum + ")");
     else { setMsg("✓ Sede aggiornata."); setTimeout(onSaved, 1000); }
   }
 
