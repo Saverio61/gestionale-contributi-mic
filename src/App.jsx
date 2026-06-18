@@ -91,13 +91,15 @@ function BadgeRegione({ regione }) {
 }
 
 // ── FORM SEDE ─────────────────────────────────────────────────
-function FormSede({ organismo_id, onSaved }) {
+function FormAnagrafica({ organismo_id, cf_attuale, onSaved }) {
   const [province, setProvince] = useState([]);
   const [comuni, setComuni] = useState([]);
   const [provSel, setProvSel] = useState("");
   const [comuneSel, setComuneSel] = useState("");
+  const [cf, setCf] = useState(cf_attuale || "");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [msgType, setMsgType] = useState("ok"); // "ok" | "err" | "warn"
 
   useEffect(() => {
     supabase.schema("contributi_mic").from("province").select("id, codice, nome, regione:regione_id(nome)").order("nome")
@@ -109,46 +111,81 @@ function FormSede({ organismo_id, onSaved }) {
       .then(({ data }) => setComuni(data || []));
   }, [provSel]);
 
+  const cfValido = /^[A-Z0-9]{11,16}$/.test(cf.trim().toUpperCase());
+
   async function salva() {
-    if (!comuneSel) return;
-    setSaving(true);
     const idNum = parseInt(organismo_id);
-    const comuneNum = parseInt(comuneSel);
-    if (!idNum || !comuneNum) { setMsg("Errore: ID non valido (" + organismo_id + ")"); setSaving(false); return; }
-    const { data, error, count } = await supabase.schema("contributi_mic").from("organismi")
-      .update({ comune_id: comuneNum })
-      .eq("id", idNum)
-      .select();
+    if (!idNum) { setMsg("Errore: ID non valido"); setMsgType("err"); return; }
+
+    const updates = {};
+    if (comuneSel) updates.comune_id = parseInt(comuneSel);
+    if (cf.trim() && cf.trim().toUpperCase() !== (cf_attuale || "").toUpperCase()) {
+      if (!cfValido) { setMsg("CF non valido — deve essere 11-16 caratteri alfanumerici"); setMsgType("err"); return; }
+      // Verifica se CF esiste già su altro organismo
+      const { data: existing } = await supabase.schema("contributi_mic").from("organismi")
+        .select("id, denominazione").eq("codice_fiscale", cf.trim().toUpperCase()).neq("id", idNum);
+      if (existing?.length > 0) {
+        setMsg(`⚠ CF già presente su: "${existing[0].denominazione}" (id=${existing[0].id}) — verifica se sono lo stesso organismo`);
+        setMsgType("warn");
+        return;
+      }
+      updates.codice_fiscale = cf.trim().toUpperCase();
+    }
+
+    if (Object.keys(updates).length === 0) { setMsg("Nessuna modifica da salvare"); setMsgType("warn"); return; }
+
+    setSaving(true);
+    const { data, error } = await supabase.schema("contributi_mic").from("organismi")
+      .update(updates).eq("id", idNum).select();
     setSaving(false);
-    if (error) setMsg("Errore: " + error.message);
-    else if (!data || data.length === 0) setMsg("⚠ Nessuna riga aggiornata (id=" + idNum + ")");
-    else { setMsg("✓ Sede aggiornata."); setTimeout(onSaved, 1000); }
+
+    if (error) { setMsg("Errore: " + error.message); setMsgType("err"); }
+    else if (!data || data.length === 0) { setMsg("⚠ Nessuna riga aggiornata (id=" + idNum + ")"); setMsgType("warn"); }
+    else { setMsg("✓ Anagrafica aggiornata."); setMsgType("ok"); setTimeout(onSaved, 1000); }
   }
 
   const sel = { padding: "7px 10px", borderRadius: 5, border: `1px solid ${T.bordo}`, fontSize: 12, background: T.bianco, color: T.testo };
+  const msgColor = msgType === "ok" ? "#065F46" : msgType === "warn" ? "#92400E" : "#B91C1C";
+
   return (
     <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, padding: "14px 16px", marginBottom: 18 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#1E3A8A", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Modifica sede</div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <div>
-          <div style={{ fontSize: 10, color: T.sub, marginBottom: 4, fontWeight: 600 }}>Provincia</div>
-          <select value={provSel} onChange={e => { setProvSel(e.target.value); setComuneSel(""); }} style={{ ...sel, minWidth: 200 }}>
-            <option value="">— Seleziona —</option>
-            {province.map(p => <option key={p.id} value={p.id}>{p.nome} ({p.codice}) · {p.regione?.nome}</option>)}
-          </select>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#1E3A8A", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>✎ Modifica anagrafica</div>
+
+      {/* CF */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10, color: T.sub, marginBottom: 4, fontWeight: 600 }}>Codice Fiscale</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input value={cf} onChange={e => setCf(e.target.value.toUpperCase())}
+            placeholder="Es. 80007690722"
+            style={{ ...sel, width: 180, ...mono, letterSpacing: 1,
+              borderColor: cf && !cfValido ? "#FCA5A5" : T.bordo }} />
+          {cf && !cfValido && <span style={{ fontSize: 10, color: "#B91C1C" }}>Formato non valido</span>}
+          {cf && cfValido && <span style={{ fontSize: 10, color: "#065F46" }}>✓</span>}
         </div>
-        <div>
-          <div style={{ fontSize: 10, color: T.sub, marginBottom: 4, fontWeight: 600 }}>Comune</div>
-          <select value={comuneSel} onChange={e => setComuneSel(e.target.value)} disabled={comuni.length === 0} style={{ ...sel, minWidth: 160, background: comuni.length === 0 ? T.sfondo : T.bianco }}>
-            <option value="">— Seleziona —</option>
+      </div>
+
+      {/* Sede */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10, color: T.sub, marginBottom: 4, fontWeight: 600 }}>Sede (opzionale)</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <select value={provSel} onChange={e => { setProvSel(e.target.value); setComuneSel(""); }} style={{ ...sel, minWidth: 190 }}>
+            <option value="">— Provincia —</option>
+            {province.map(p => <option key={p.id} value={p.id}>{p.nome} ({p.codice})</option>)}
+          </select>
+          <select value={comuneSel} onChange={e => setComuneSel(e.target.value)} disabled={comuni.length === 0}
+            style={{ ...sel, minWidth: 150, background: comuni.length === 0 ? T.sfondo : T.bianco }}>
+            <option value="">— Comune —</option>
             {comuni.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
         </div>
-        <button onClick={salva} disabled={!comuneSel || saving}
-          style={{ padding: "7px 18px", borderRadius: 5, border: "none", background: comuneSel ? "#1D4ED8" : T.bordo, color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: comuneSel ? "pointer" : "default" }}>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <button onClick={salva} disabled={saving}
+          style={{ padding: "7px 20px", borderRadius: 5, border: "none", background: "#1D4ED8", color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
           {saving ? "Salvo…" : "Salva"}
         </button>
-        {msg && <span style={{ fontSize: 12, color: "#065F46", fontWeight: 700 }}>{msg}</span>}
+        {msg && <span style={{ fontSize: 12, color: msgColor, fontWeight: 700 }}>{msg}</span>}
       </div>
     </div>
   );
@@ -201,7 +238,7 @@ function SchedaOrganismo({ org, onClose }) {
                 )}
                 <button onClick={() => setShowSede(!showSede)}
                   style={{ fontSize: 10, background: "rgba(255,255,255,0.12)", color: "#FFFFFF", border: "none", borderRadius: 4, padding: "3px 9px", cursor: "pointer", fontWeight: 600 }}>
-                  {showSede ? "✕ chiudi" : "✎ modifica sede"}
+                  {showSede ? "✕ chiudi" : "✎ modifica anagrafica"}
                 </button>
               </div>
             </div>
@@ -210,7 +247,7 @@ function SchedaOrganismo({ org, onClose }) {
         </div>
 
         <div style={{ overflow: "auto", flex: 1, padding: "20px 24px" }}>
-          {showSede && dati.id_organismo && <FormSede organismo_id={dati.id_organismo} onSaved={ricarica} />}
+          {showSede && dati.id_organismo && <FormAnagrafica organismo_id={dati.id_organismo} cf_attuale={dati.codice_fiscale} onSaved={ricarica} />}
 
           {/* KPI */}
           <div style={{ display: "grid", gridTemplateColumns: totReg > 0 ? "repeat(3,1fr)" : "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
