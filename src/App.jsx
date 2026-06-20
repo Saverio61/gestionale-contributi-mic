@@ -289,7 +289,7 @@ function SchedaOrganismo({ org, onClose }) {
                     <td style={{ padding: "9px 10px" }}><BadgeAmbito ambito={a.ambito} /></td>
                     <td style={{ padding: "9px 10px", color: T.sub, fontSize: 11, ...mono, fontWeight: 600 }}>{a.articolo_dm}</td>
                     <td style={{ padding: "9px 10px", fontSize: 11, color: T.sub, fontWeight: 600 }}>
-                      {a.numero_sottoinsieme > 1 ? `${["","1°","2°","3°","4°","5°"][a.numero_sottoinsieme]}` : "—"}
+                      {a.numero_sottoinsieme > 1 ? `${["","1°","2°","3°","4°","5°","6°","7°","8°","9°","10°"][a.numero_sottoinsieme]}` : "—"}
                     </td>
                     {[a.punteggio_vd, a.punteggio_qa, a.punteggio_qi, a.punteggio_da].map((v, vi) => (
                       <td key={vi} style={{ padding: "9px 8px", ...mono, color: v > 0 ? "#0F172A" : T.muted, fontSize: 11, fontWeight: v > 0 ? 700 : 400 }}>{v > 0 ? v.toFixed(2) : "—"}</td>
