@@ -775,6 +775,147 @@ function Dashboard() {
 }
 
 // ── PUGLIA & BASILICATA ───────────────────────────────────────
+function generaReportHTML(organismi) {
+  const fmt2 = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
+  const oggi = new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
+
+  // Per ogni organismo, calcola totale per anno (2025, 2026, 2027) e variazione
+  const righe = organismi.map(o => {
+    const perAnno = { 2025: 0, 2026: 0, 2027: 0 };
+    o.assegnazioni.forEach(a => {
+      if (perAnno[a.anno] !== undefined) perAnno[a.anno] += (a.contributo_assegnato || 0);
+    });
+    const var2526 = perAnno[2025] > 0 ? ((perAnno[2026] - perAnno[2025]) / perAnno[2025]) * 100 : null;
+    return { ...o, perAnno, var2526 };
+  }).sort((a, b) => (b.perAnno[2025] + b.perAnno[2026]) - (a.perAnno[2025] + a.perAnno[2026]));
+
+  const totali2025 = righe.reduce((s, r) => s + r.perAnno[2025], 0);
+  const totali2026 = righe.reduce((s, r) => s + r.perAnno[2026], 0);
+  const totali2027 = righe.reduce((s, r) => s + r.perAnno[2027], 0);
+  const varTotale = totali2025 > 0 ? ((totali2026 - totali2025) / totali2025) * 100 : 0;
+
+  const righeHTML = righe.map(r => {
+    const variazioneColor = r.var2526 === null ? "#94A3B8" : r.var2526 >= 0 ? "#059669" : "#DC2626";
+    const variazioneSegno = r.var2526 === null ? "—" : (r.var2526 >= 0 ? "+" : "") + r.var2526.toFixed(1) + "%";
+    const variazioneIcona = r.var2526 === null ? "" : r.var2526 >= 0 ? "▲" : "▼";
+    return `
+      <tr>
+        <td style="padding:8px 10px;font-weight:700;color:#0F172A;border-bottom:1px solid #E2E8F0;">${r.denominazione}</td>
+        <td style="padding:8px 10px;color:#64748B;font-size:11px;border-bottom:1px solid #E2E8F0;">${r.comune || '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-family:monospace;color:#374151;border-bottom:1px solid #E2E8F0;">${r.perAnno[2025] > 0 ? fmt2(r.perAnno[2025]) : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-family:monospace;color:#374151;border-bottom:1px solid #E2E8F0;">${r.perAnno[2026] > 0 ? fmt2(r.perAnno[2026]) : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-weight:700;color:${variazioneColor};border-bottom:1px solid #E2E8F0;">${variazioneIcona} ${variazioneSegno}</td>
+      </tr>`;
+  }).join('');
+
+  // Dati per grafico: top 15 organismi per totale combinato
+  const top15 = righe.slice(0, 15);
+  const maxVal = Math.max(...top15.map(r => Math.max(r.perAnno[2025], r.perAnno[2026])));
+  const barreHTML = top15.map(r => {
+    const pct2025 = maxVal > 0 ? (r.perAnno[2025] / maxVal) * 100 : 0;
+    const pct2026 = maxVal > 0 ? (r.perAnno[2026] / maxVal) * 100 : 0;
+    const nomeShort = r.denominazione.length > 38 ? r.denominazione.slice(0, 36) + '…' : r.denominazione;
+    return `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;color:#374151;font-weight:600;margin-bottom:3px;">${nomeShort}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="font-size:8px;color:#94A3B8;width:32px;">2025</span>
+          <div style="flex:1;height:10px;background:#F1F5F9;border-radius:3px;overflow:hidden;">
+            <div style="width:${pct2025}%;height:100%;background:#1D4ED8;"></div>
+          </div>
+          <span style="font-size:9px;color:#374151;font-family:monospace;width:75px;text-align:right;">${fmt2(r.perAnno[2025])}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:8px;color:#94A3B8;width:32px;">2026</span>
+          <div style="flex:1;height:10px;background:#F1F5F9;border-radius:3px;overflow:hidden;">
+            <div style="width:${pct2026}%;height:100%;background:#C2410C;"></div>
+          </div>
+          <span style="font-size:9px;color:#374151;font-family:monospace;width:75px;text-align:right;">${fmt2(r.perAnno[2026])}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Report Puglia e Basilicata - Confronto Annuale</title>
+<style>
+  @page { margin: 18mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #0F172A; margin: 0; padding: 0; }
+  .header { background: linear-gradient(135deg,#0A1628,#1E3A5F); color: white; padding: 24px 28px; margin-bottom: 20px; }
+  .header .sub { font-size: 9px; color: #F0C040; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin-bottom: 6px; }
+  .header h1 { font-size: 22px; margin: 0; font-weight: 900; }
+  .header p { font-size: 11px; color: rgba(255,255,255,0.6); margin: 6px 0 0; }
+  .kpi-row { display: flex; gap: 12px; margin-bottom: 24px; }
+  .kpi { flex: 1; background: #F8FAFC; border: 1px solid #E2E8F0; border-top: 3px solid #1D4ED8; border-radius: 6px; padding: 12px 14px; }
+  .kpi .label { font-size: 9px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
+  .kpi .value { font-size: 18px; font-weight: 900; font-family: monospace; }
+  .section-title { font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 1.5px; margin: 24px 0 10px; border-bottom: 2px solid #E2E8F0; padding-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  thead th { background: #0A1628; color: white; padding: 8px 10px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 9px; color: #94A3B8; display: flex; justify-content: space-between; }
+  @media print { .no-print { display: none; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="sub">AGIS Puglia e Basilicata · Gestionale Contributi Spettacolo dal Vivo</div>
+    <h1>Report Puglia &amp; Basilicata — Confronto Annuale 2025/2026</h1>
+    <p>Generato il ${oggi} · ${righe.length} organismi · MIC/FNSV e Regione Puglia</p>
+  </div>
+
+  <div style="padding:0 4px;">
+    <div class="kpi-row">
+      <div class="kpi"><div class="label">Totale 2025</div><div class="value" style="color:#1D4ED8;">${fmt2(totali2025)}</div></div>
+      <div class="kpi" style="border-top-color:#C2410C;"><div class="label">Totale 2026</div><div class="value" style="color:#C2410C;">${fmt2(totali2026)}</div></div>
+      <div class="kpi" style="border-top-color:${varTotale>=0?'#059669':'#DC2626'};"><div class="label">Variazione</div><div class="value" style="color:${varTotale>=0?'#059669':'#DC2626'};">${varTotale>=0?'+':''}${varTotale.toFixed(1)}%</div></div>
+      <div class="kpi" style="border-top-color:#92400E;"><div class="label">Organismi</div><div class="value" style="color:#92400E;">${righe.length}</div></div>
+    </div>
+
+    <div class="section-title">📊 Top 15 organismi — confronto 2025 vs 2026</div>
+    <div style="background:#FAFAFA;border:1px solid #E2E8F0;border-radius:6px;padding:16px;">
+      ${barreHTML}
+    </div>
+
+    <div class="section-title">📋 Elenco completo con variazione anno su anno</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Organismo</th>
+          <th>Sede</th>
+          <th style="text-align:right;">2025</th>
+          <th style="text-align:right;">2026</th>
+          <th style="text-align:right;">Variazione</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${righeHTML}
+      </tbody>
+      <tfoot>
+        <tr style="background:#F1F5F9;font-weight:800;">
+          <td colspan="2" style="padding:10px;">TOTALE</td>
+          <td style="padding:10px;text-align:right;font-family:monospace;">${fmt2(totali2025)}</td>
+          <td style="padding:10px;text-align:right;font-family:monospace;">${fmt2(totali2026)}</td>
+          <td style="padding:10px;text-align:right;font-family:monospace;color:${varTotale>=0?'#059669':'#DC2626'};">${varTotale>=0?'+':''}${varTotale.toFixed(1)}%</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="footer">
+      <span>AGIS Puglia e Basilicata · Gestionale Contributi · Dati MIC / DG Spettacolo e Regione Puglia</span>
+      <span>Report generato automaticamente</span>
+    </div>
+  </div>
+
+  <div class="no-print" style="text-align:center;margin-top:24px;">
+    <button onclick="window.print()" style="padding:10px 24px;background:#1D4ED8;color:white;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">🖨️ Stampa / Salva PDF</button>
+  </div>
+</body>
+</html>`;
+}
+
 function PugliaBasilicata() {
   const { organismi, loading } = useOrganismi({ regioni: ["Puglia", "Basilicata"] });
   const [selected, setSelected] = useState(null);
@@ -782,6 +923,13 @@ function PugliaBasilicata() {
   const totPU = organismi.filter(o => o.regione === "Puglia").reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "MIC_FNSV").reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
   const totBA = organismi.filter(o => o.regione === "Basilicata").reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "MIC_FNSV").reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
   const totRegPU = organismi.filter(o => o.fonti.includes("REG_PU")).reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "REG_PU" && a.anno === 2025).reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
+
+  function apriReport() {
+    const html = generaReportHTML(organismi);
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+  }
 
   if (loading) return <div style={{ padding: 48, color: T.muted }}>Caricamento…</div>;
 
@@ -791,10 +939,15 @@ function PugliaBasilicata() {
 
       <div style={{ background: "linear-gradient(135deg,#7C2D12,#C2410C,#EA580C)", padding: "24px 36px", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", right: -40, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
-        <div style={{ position: "relative" }}>
-          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>AGIS · Focus Regionale</div>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: "#FFFFFF", margin: "0 0 6px", ...serif }}>Puglia <span style={{ color: "#FED7AA" }}>&</span> Basilicata</h1>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", margin: 0 }}>Contributi MIC/FNSV e Regione Puglia · {organismi.length} organismi</p>
+        <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>AGIS · Focus Regionale</div>
+            <h1 style={{ fontSize: 26, fontWeight: 900, color: "#FFFFFF", margin: "0 0 6px", ...serif }}>Puglia <span style={{ color: "#FED7AA" }}>&</span> Basilicata</h1>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", margin: 0 }}>Contributi MIC/FNSV e Regione Puglia · {organismi.length} organismi</p>
+          </div>
+          <button onClick={apriReport} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", padding: "10px 18px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+            📄 Genera Report Confronto Annuale
+          </button>
         </div>
       </div>
 
