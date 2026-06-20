@@ -779,58 +779,89 @@ function generaReportHTML(organismi) {
   const fmt2 = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
   const oggi = new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
 
-  // Per ogni organismo, calcola totale per anno (2025, 2026, 2027) e variazione
+  // Per ogni organismo, calcola totale per anno E per fonte (MIC vs Regione Puglia)
   const righe = organismi.map(o => {
-    const perAnno = { 2025: 0, 2026: 0, 2027: 0 };
+    const mic = { 2025: 0, 2026: 0, 2027: 0 };
+    const reg = { 2025: 0, 2026: 0, 2027: 0 };
     o.assegnazioni.forEach(a => {
-      if (perAnno[a.anno] !== undefined) perAnno[a.anno] += (a.contributo_assegnato || 0);
+      const target = a.tipo_decreto === "REG_PU" ? reg : mic;
+      if (target[a.anno] !== undefined) target[a.anno] += (a.contributo_assegnato || 0);
     });
-    const var2526 = perAnno[2025] > 0 ? ((perAnno[2026] - perAnno[2025]) / perAnno[2025]) * 100 : null;
-    return { ...o, perAnno, var2526 };
-  }).sort((a, b) => (b.perAnno[2025] + b.perAnno[2026]) - (a.perAnno[2025] + a.perAnno[2026]));
+    const totale2025 = mic[2025] + reg[2025];
+    const totale2026 = mic[2026] + reg[2026];
+    const varMic = mic[2025] > 0 ? ((mic[2026] - mic[2025]) / mic[2025]) * 100 : (mic[2026] > 0 ? null : null);
+    const varReg = reg[2025] > 0 ? ((reg[2026] - reg[2025]) / reg[2025]) * 100 : null;
+    return { ...o, mic, reg, totale2025, totale2026, varMic, varReg };
+  }).sort((a, b) => (b.totale2025 + b.totale2026) - (a.totale2025 + a.totale2026));
 
-  const totali2025 = righe.reduce((s, r) => s + r.perAnno[2025], 0);
-  const totali2026 = righe.reduce((s, r) => s + r.perAnno[2026], 0);
-  const totali2027 = righe.reduce((s, r) => s + r.perAnno[2027], 0);
-  const varTotale = totali2025 > 0 ? ((totali2026 - totali2025) / totali2025) * 100 : 0;
+  const micTot2025 = righe.reduce((s, r) => s + r.mic[2025], 0);
+  const micTot2026 = righe.reduce((s, r) => s + r.mic[2026], 0);
+  const regTot2025 = righe.reduce((s, r) => s + r.reg[2025], 0);
+  const regTot2026 = righe.reduce((s, r) => s + r.reg[2026], 0);
+  const varMicTotale = micTot2025 > 0 ? ((micTot2026 - micTot2025) / micTot2025) * 100 : 0;
+  const varRegTotale = regTot2025 > 0 ? ((regTot2026 - regTot2025) / regTot2025) * 100 : 0;
 
-  const righeHTML = righe.map(r => {
-    const variazioneColor = r.var2526 === null ? "#94A3B8" : r.var2526 >= 0 ? "#059669" : "#DC2626";
-    const variazioneSegno = r.var2526 === null ? "—" : (r.var2526 >= 0 ? "+" : "") + r.var2526.toFixed(1) + "%";
-    const variazioneIcona = r.var2526 === null ? "" : r.var2526 >= 0 ? "▲" : "▼";
-    return `
+  const variazioneTag = (v) => {
+    if (v === null) return '<span style="color:#94A3B8;">—</span>';
+    const color = v >= 0 ? "#059669" : "#DC2626";
+    const icona = v >= 0 ? "▲" : "▼";
+    return `<span style="color:${color};font-weight:700;">${icona} ${v>=0?'+':''}${v.toFixed(1)}%</span>`;
+  };
+
+  const righeHTML = righe.map(r => `
       <tr>
-        <td style="padding:8px 10px;font-weight:700;color:#0F172A;border-bottom:1px solid #E2E8F0;">${r.denominazione}</td>
-        <td style="padding:8px 10px;color:#64748B;font-size:11px;border-bottom:1px solid #E2E8F0;">${r.comune || '—'}</td>
-        <td style="padding:8px 10px;text-align:right;font-family:monospace;color:#374151;border-bottom:1px solid #E2E8F0;">${r.perAnno[2025] > 0 ? fmt2(r.perAnno[2025]) : '—'}</td>
-        <td style="padding:8px 10px;text-align:right;font-family:monospace;color:#374151;border-bottom:1px solid #E2E8F0;">${r.perAnno[2026] > 0 ? fmt2(r.perAnno[2026]) : '—'}</td>
-        <td style="padding:8px 10px;text-align:right;font-weight:700;color:${variazioneColor};border-bottom:1px solid #E2E8F0;">${variazioneIcona} ${variazioneSegno}</td>
-      </tr>`;
-  }).join('');
+        <td style="padding:7px 9px;font-weight:700;color:#0F172A;border-bottom:1px solid #E2E8F0;font-size:10px;">${r.denominazione}</td>
+        <td style="padding:7px 9px;color:#64748B;font-size:9px;border-bottom:1px solid #E2E8F0;">${r.comune || '—'}</td>
+        <td style="padding:7px 8px;text-align:right;font-family:monospace;color:#1D4ED8;font-size:10px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${r.mic[2025] > 0 ? fmt2(r.mic[2025]) : '—'}</td>
+        <td style="padding:7px 8px;text-align:right;font-family:monospace;color:#1D4ED8;font-size:10px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${r.mic[2026] > 0 ? fmt2(r.mic[2026]) : '—'}</td>
+        <td style="padding:7px 8px;text-align:right;font-size:9px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${variazioneTag(r.varMic)}</td>
+        <td style="padding:7px 8px;text-align:right;font-family:monospace;color:#C2410C;font-size:10px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${r.reg[2025] > 0 ? fmt2(r.reg[2025]) : '—'}</td>
+        <td style="padding:7px 8px;text-align:right;font-family:monospace;color:#C2410C;font-size:10px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${r.reg[2026] > 0 ? fmt2(r.reg[2026]) : '—'}</td>
+        <td style="padding:7px 8px;text-align:right;font-size:9px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${variazioneTag(r.varReg)}</td>
+        <td style="padding:7px 9px;text-align:right;font-family:monospace;font-weight:800;color:#065F46;font-size:10px;border-bottom:1px solid #E2E8F0;">${fmt2(r.totale2025 + r.totale2026)}</td>
+      </tr>`).join('');
 
-  // Dati per grafico: top 15 organismi per totale combinato
-  const top15 = righe.slice(0, 15);
-  const maxVal = Math.max(...top15.map(r => Math.max(r.perAnno[2025], r.perAnno[2026])));
-  const barreHTML = top15.map(r => {
-    const pct2025 = maxVal > 0 ? (r.perAnno[2025] / maxVal) * 100 : 0;
-    const pct2026 = maxVal > 0 ? (r.perAnno[2026] / maxVal) * 100 : 0;
-    const nomeShort = r.denominazione.length > 38 ? r.denominazione.slice(0, 36) + '…' : r.denominazione;
+  // Grafico: top 12 per fonte separata
+  const top12 = righe.slice(0, 12);
+  const maxValMic = Math.max(...top12.map(r => Math.max(r.mic[2025], r.mic[2026])), 1);
+  const maxValReg = Math.max(...top12.map(r => Math.max(r.reg[2025], r.reg[2026])), 1);
+
+  const barreHTML = top12.map(r => {
+    const nomeShort = r.denominazione.length > 34 ? r.denominazione.slice(0, 32) + '…' : r.denominazione;
+    const pctMic25 = (r.mic[2025] / maxValMic) * 100;
+    const pctMic26 = (r.mic[2026] / maxValMic) * 100;
+    const pctReg25 = (r.reg[2025] / maxValReg) * 100;
+    const pctReg26 = (r.reg[2026] / maxValReg) * 100;
     return `
-      <div style="margin-bottom:10px;">
-        <div style="font-size:10px;color:#374151;font-weight:600;margin-bottom:3px;">${nomeShort}</div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-          <span style="font-size:8px;color:#94A3B8;width:32px;">2025</span>
-          <div style="flex:1;height:10px;background:#F1F5F9;border-radius:3px;overflow:hidden;">
-            <div style="width:${pct2025}%;height:100%;background:#1D4ED8;"></div>
+      <div style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9;">
+        <div style="font-size:10px;color:#0F172A;font-weight:700;margin-bottom:5px;">${nomeShort}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <div style="font-size:7px;color:#1D4ED8;font-weight:700;text-transform:uppercase;margin-bottom:2px;">MIC · FNSV</div>
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;">
+              <span style="font-size:7px;color:#94A3B8;width:24px;">25</span>
+              <div style="flex:1;height:7px;background:#EFF6FF;border-radius:2px;overflow:hidden;"><div style="width:${pctMic25}%;height:100%;background:#1D4ED8;"></div></div>
+              <span style="font-size:7px;color:#1D4ED8;font-family:monospace;width:62px;text-align:right;">${fmt2(r.mic[2025])}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-size:7px;color:#94A3B8;width:24px;">26</span>
+              <div style="flex:1;height:7px;background:#EFF6FF;border-radius:2px;overflow:hidden;"><div style="width:${pctMic26}%;height:100%;background:#3B82F6;"></div></div>
+              <span style="font-size:7px;color:#1D4ED8;font-family:monospace;width:62px;text-align:right;">${fmt2(r.mic[2026])}</span>
+            </div>
           </div>
-          <span style="font-size:9px;color:#374151;font-family:monospace;width:75px;text-align:right;">${fmt2(r.perAnno[2025])}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <span style="font-size:8px;color:#94A3B8;width:32px;">2026</span>
-          <div style="flex:1;height:10px;background:#F1F5F9;border-radius:3px;overflow:hidden;">
-            <div style="width:${pct2026}%;height:100%;background:#C2410C;"></div>
+          <div>
+            <div style="font-size:7px;color:#C2410C;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Regione Puglia</div>
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;">
+              <span style="font-size:7px;color:#94A3B8;width:24px;">25</span>
+              <div style="flex:1;height:7px;background:#FFF7ED;border-radius:2px;overflow:hidden;"><div style="width:${pctReg25}%;height:100%;background:#C2410C;"></div></div>
+              <span style="font-size:7px;color:#C2410C;font-family:monospace;width:62px;text-align:right;">${r.reg[2025]>0?fmt2(r.reg[2025]):'—'}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-size:7px;color:#94A3B8;width:24px;">26</span>
+              <div style="flex:1;height:7px;background:#FFF7ED;border-radius:2px;overflow:hidden;"><div style="width:${pctReg26}%;height:100%;background:#F97316;"></div></div>
+              <span style="font-size:7px;color:#C2410C;font-family:monospace;width:62px;text-align:right;">${r.reg[2026]>0?fmt2(r.reg[2026]):'—'}</span>
+            </div>
           </div>
-          <span style="font-size:9px;color:#374151;font-family:monospace;width:75px;text-align:right;">${fmt2(r.perAnno[2026])}</span>
         </div>
       </div>`;
   }).join('');
@@ -839,55 +870,65 @@ function generaReportHTML(organismi) {
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Report Puglia e Basilicata - Confronto Annuale</title>
+<title>Report Puglia e Basilicata - Confronto MIC e Regione Puglia</title>
 <style>
-  @page { margin: 18mm 14mm; }
+  @page { margin: 16mm 12mm; }
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; color: #0F172A; margin: 0; padding: 0; }
-  .header { background: linear-gradient(135deg,#0A1628,#1E3A5F); color: white; padding: 24px 28px; margin-bottom: 20px; }
+  .header { background: linear-gradient(135deg,#0A1628,#1E3A5F); color: white; padding: 22px 26px; margin-bottom: 18px; }
   .header .sub { font-size: 9px; color: #F0C040; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin-bottom: 6px; }
-  .header h1 { font-size: 22px; margin: 0; font-weight: 900; }
-  .header p { font-size: 11px; color: rgba(255,255,255,0.6); margin: 6px 0 0; }
-  .kpi-row { display: flex; gap: 12px; margin-bottom: 24px; }
-  .kpi { flex: 1; background: #F8FAFC; border: 1px solid #E2E8F0; border-top: 3px solid #1D4ED8; border-radius: 6px; padding: 12px 14px; }
-  .kpi .label { font-size: 9px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
-  .kpi .value { font-size: 18px; font-weight: 900; font-family: monospace; }
-  .section-title { font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 1.5px; margin: 24px 0 10px; border-bottom: 2px solid #E2E8F0; padding-bottom: 6px; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  thead th { background: #0A1628; color: white; padding: 8px 10px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 9px; color: #94A3B8; display: flex; justify-content: space-between; }
-  @media print { .no-print { display: none; } }
+  .header h1 { font-size: 20px; margin: 0; font-weight: 900; }
+  .header p { font-size: 10px; color: rgba(255,255,255,0.6); margin: 6px 0 0; }
+  .kpi-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .kpi { flex: 1; background: #F8FAFC; border: 1px solid #E2E8F0; border-top: 3px solid #1D4ED8; border-radius: 6px; padding: 10px 12px; }
+  .kpi .label { font-size: 8px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 5px; }
+  .kpi .value { font-size: 15px; font-weight: 900; font-family: monospace; }
+  .section-title { font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 1.5px; margin: 20px 0 10px; border-bottom: 2px solid #E2E8F0; padding-bottom: 5px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: #0A1628; color: white; padding: 7px 8px; text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #E2E8F0; font-size: 8px; color: #94A3B8; display: flex; justify-content: space-between; }
+  @media print { .no-print { display: none; } table { page-break-inside: auto; } tr { page-break-inside: avoid; } }
 </style>
 </head>
 <body>
   <div class="header">
     <div class="sub">AGIS Puglia e Basilicata · Gestionale Contributi Spettacolo dal Vivo</div>
-    <h1>Report Puglia &amp; Basilicata — Confronto Annuale 2025/2026</h1>
-    <p>Generato il ${oggi} · ${righe.length} organismi · MIC/FNSV e Regione Puglia</p>
+    <h1>Report Puglia &amp; Basilicata — MIC/FNSV e Regione Puglia · 2025/2026</h1>
+    <p>Generato il ${oggi} · ${righe.length} organismi</p>
   </div>
 
   <div style="padding:0 4px;">
     <div class="kpi-row">
-      <div class="kpi"><div class="label">Totale 2025</div><div class="value" style="color:#1D4ED8;">${fmt2(totali2025)}</div></div>
-      <div class="kpi" style="border-top-color:#C2410C;"><div class="label">Totale 2026</div><div class="value" style="color:#C2410C;">${fmt2(totali2026)}</div></div>
-      <div class="kpi" style="border-top-color:${varTotale>=0?'#059669':'#DC2626'};"><div class="label">Variazione</div><div class="value" style="color:${varTotale>=0?'#059669':'#DC2626'};">${varTotale>=0?'+':''}${varTotale.toFixed(1)}%</div></div>
-      <div class="kpi" style="border-top-color:#92400E;"><div class="label">Organismi</div><div class="value" style="color:#92400E;">${righe.length}</div></div>
+      <div class="kpi"><div class="label">MIC 2025</div><div class="value" style="color:#1D4ED8;">${fmt2(micTot2025)}</div></div>
+      <div class="kpi"><div class="label">MIC 2026</div><div class="value" style="color:#1D4ED8;">${fmt2(micTot2026)}</div></div>
+      <div class="kpi" style="border-top-color:${varMicTotale>=0?'#059669':'#DC2626'};"><div class="label">Var. MIC</div><div class="value" style="color:${varMicTotale>=0?'#059669':'#DC2626'};">${varMicTotale>=0?'+':''}${varMicTotale.toFixed(1)}%</div></div>
+      <div class="kpi" style="border-top-color:#C2410C;"><div class="label">Reg. Puglia 2025</div><div class="value" style="color:#C2410C;">${fmt2(regTot2025)}</div></div>
+      <div class="kpi" style="border-top-color:#C2410C;"><div class="label">Reg. Puglia 2026</div><div class="value" style="color:#C2410C;">${fmt2(regTot2026)}</div></div>
+      <div class="kpi" style="border-top-color:${varRegTotale>=0?'#059669':'#DC2626'};"><div class="label">Var. Reg. Puglia</div><div class="value" style="color:${varRegTotale>=0?'#059669':'#DC2626'};">${varRegTotale>=0?'+':''}${varRegTotale.toFixed(1)}%</div></div>
     </div>
 
-    <div class="section-title">📊 Top 15 organismi — confronto 2025 vs 2026</div>
-    <div style="background:#FAFAFA;border:1px solid #E2E8F0;border-radius:6px;padding:16px;">
+    <div class="section-title">📊 Top 12 organismi — MIC vs Regione Puglia, confronto 2025/2026</div>
+    <div style="background:#FAFAFA;border:1px solid #E2E8F0;border-radius:6px;padding:14px;">
       ${barreHTML}
     </div>
 
-    <div class="section-title">📋 Elenco completo con variazione anno su anno</div>
+    <div class="section-title">📋 Elenco completo — MIC e Regione Puglia separati</div>
     <table>
       <thead>
         <tr>
-          <th>Organismo</th>
-          <th>Sede</th>
-          <th style="text-align:right;">2025</th>
-          <th style="text-align:right;">2026</th>
-          <th style="text-align:right;">Variazione</th>
+          <th rowspan="2" style="vertical-align:bottom;">Organismo</th>
+          <th rowspan="2" style="vertical-align:bottom;">Sede</th>
+          <th colspan="3" style="text-align:center;background:#1E3A8A;">MIC · FNSV</th>
+          <th colspan="3" style="text-align:center;background:#9A3412;">Regione Puglia</th>
+          <th rowspan="2" style="text-align:right;vertical-align:bottom;">Totale</th>
+        </tr>
+        <tr>
+          <th style="text-align:right;background:#1E3A8A;">2025</th>
+          <th style="text-align:right;background:#1E3A8A;">2026</th>
+          <th style="text-align:right;background:#1E3A8A;">Var.</th>
+          <th style="text-align:right;background:#9A3412;">2025</th>
+          <th style="text-align:right;background:#9A3412;">2026</th>
+          <th style="text-align:right;background:#9A3412;">Var.</th>
         </tr>
       </thead>
       <tbody>
@@ -895,10 +936,14 @@ function generaReportHTML(organismi) {
       </tbody>
       <tfoot>
         <tr style="background:#F1F5F9;font-weight:800;">
-          <td colspan="2" style="padding:10px;">TOTALE</td>
-          <td style="padding:10px;text-align:right;font-family:monospace;">${fmt2(totali2025)}</td>
-          <td style="padding:10px;text-align:right;font-family:monospace;">${fmt2(totali2026)}</td>
-          <td style="padding:10px;text-align:right;font-family:monospace;color:${varTotale>=0?'#059669':'#DC2626'};">${varTotale>=0?'+':''}${varTotale.toFixed(1)}%</td>
+          <td colspan="2" style="padding:9px;font-size:10px;">TOTALE</td>
+          <td style="padding:9px;text-align:right;font-family:monospace;font-size:10px;">${fmt2(micTot2025)}</td>
+          <td style="padding:9px;text-align:right;font-family:monospace;font-size:10px;">${fmt2(micTot2026)}</td>
+          <td style="padding:9px;text-align:right;font-size:9px;">${variazioneTag(varMicTotale)}</td>
+          <td style="padding:9px;text-align:right;font-family:monospace;font-size:10px;">${fmt2(regTot2025)}</td>
+          <td style="padding:9px;text-align:right;font-family:monospace;font-size:10px;">${fmt2(regTot2026)}</td>
+          <td style="padding:9px;text-align:right;font-size:9px;">${variazioneTag(varRegTotale)}</td>
+          <td style="padding:9px;text-align:right;font-family:monospace;font-size:11px;color:#065F46;">${fmt2(micTot2025+micTot2026+regTot2025+regTot2026)}</td>
         </tr>
       </tfoot>
     </table>
@@ -909,7 +954,7 @@ function generaReportHTML(organismi) {
     </div>
   </div>
 
-  <div class="no-print" style="text-align:center;margin-top:24px;">
+  <div class="no-print" style="text-align:center;margin-top:20px;">
     <button onclick="window.print()" style="padding:10px 24px;background:#1D4ED8;color:white;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">🖨️ Stampa / Salva PDF</button>
   </div>
 </body>
