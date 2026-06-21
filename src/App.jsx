@@ -1035,3 +1035,101 @@ function PugliaBasilicata() {
   );
 }
 
+
+function Decreti() {
+  const [dati, setDati] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [decretoSel, setDecretoSel] = useState(null);
+  const [assegnazioni, setAssegnazioni] = useState([]);
+  const [loadingAss, setLoadingAss] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const { organismi } = useOrganismi();
+
+  useEffect(() => {
+    supabase.schema("contributi_mic").from("decreti").select("*, ambito:ambito_id(nome)").order("anno_finanziario", { ascending: false }).order("data", { ascending: false })
+      .then(({ data }) => { setDati(data || []); setLoading(false); });
+  }, []);
+
+  async function apriDecreto(d) {
+    if (decretoSel?.id === d.id) { setDecretoSel(null); setAssegnazioni([]); return; }
+    setDecretoSel(d);
+    setLoadingAss(true);
+    const { data } = await supabase.schema("contributi_mic").from("v_assegnazioni").select("*")
+      .eq("numero_rep", d.numero_rep).eq("anno", d.anno_finanziario)
+      .order("contributo_assegnato", { ascending: false });
+    const map = {};
+    for (const a of (data || [])) {
+      const key = a.id_organismo;
+      if (!map[key]) {
+        map[key] = { ...a, id: key, ambiti: new Set(), anni: new Set(), fonti: new Set(), totale: 0, assegnazioni: [] };
+      }
+      map[key].ambiti.add(a.ambito);
+      map[key].anni.add(a.anno);
+      map[key].fonti.add(a.tipo_decreto);
+      map[key].totale += a.contributo_assegnato || 0;
+      map[key].assegnazioni.push(a);
+    }
+    setAssegnazioni(Object.values(map).map(o => ({ ...o, ambiti: [...o.ambiti], anni: [...o.anni], fonti: [...o.fonti] })));
+    setLoadingAss(false);
+  }
+
+  if (loading) return <div style={{ padding: 48, color: T.muted }}>Caricamento…</div>;
+
+  return (
+    <div style={{ padding: "28px 36px" }}>
+      {selected && <SchedaOrganismo org={selected} onClose={() => setSelected(null)} />}
+      <div style={{ marginBottom: 22 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 900, color: T.testo, margin: 0 }}>Decreti importati</h1>
+        <p style={{ fontSize: 12, color: T.muted, margin: "5px 0 0" }}>Clicca un decreto per vedere gli organismi finanziati</p>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {dati.map(d => (
+          <div key={d.id}>
+            <div onClick={() => apriDecreto(d)} style={{ background: T.bianco, border: `1px solid ${decretoSel?.id === d.id ? T.marino : T.bordo}`, borderLeft: `4px solid ${T.oro}`, borderRadius: 8, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", transition: "border-color 0.15s" }}>
+              <div style={{ background: T.inchiostro, color: "#FFFFFF", borderRadius: 6, padding: "8px 14px", textAlign: "center", flexShrink: 0, ...mono }}>
+                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>REP.</div>
+                <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1 }}>{d.numero_rep?.slice(0,10)}</div>
+                <div style={{ fontSize: 9, color: T.oro, marginTop: 2 }}>{d.anno_finanziario}</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: T.testo }}>{d.ambito?.nome}</span>
+                  <BadgeTipo tipo={d.tipo} />
+                </div>
+                <div style={{ fontSize: 11, color: T.sub, fontWeight: 500 }}>{d.ente_erogante} · {d.data}</div>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#065F46", ...mono }}>{fmt(d.stanziamento_totale)}</div>
+              <div style={{ fontSize: 16, color: T.muted, marginLeft: 8 }}>{decretoSel?.id === d.id ? "▲" : "▼"}</div>
+            </div>
+            {decretoSel?.id === d.id && (
+              <div style={{ border: `1px solid ${T.bordo}`, borderTop: "none", borderRadius: "0 0 8px 8px", background: T.sfondo, padding: 16 }}>
+                {loadingAss ? <div style={{ padding: 20, color: T.muted }}>Caricamento…</div> :
+                  <TabellaOrganismi organismi={assegnazioni} onSelect={setSelected} />
+                }
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [sezione, setSezione] = useState("dashboard");
+  const contenuto = {
+    dashboard:         <Dashboard />,
+    organismi:         <div style={{ padding: "22px 36px" }}><div style={{ marginBottom: 18 }}><h1 style={{ fontSize: 22, fontWeight: 900, color: T.testo, margin: 0 }}>Organismi</h1><p style={{ fontSize: 12, color: T.muted, margin: "4px 0 0" }}>Anagrafica completa · Clicca un organismo per vedere tutte le sue assegnazioni</p></div><Organismi /></div>,
+    puglia_basilicata: <PugliaBasilicata />,
+    decreti:           <Decreti />,
+    parser:            <ParserDecreto />,
+  }[sezione];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Segoe UI', system-ui, sans-serif", background: T.sfondo }}>
+      <Topbar sezione={sezione} setSezione={setSezione} />
+      <main style={{ flex: 1, overflow: "auto" }}>{contenuto}</main>
+    </div>
+  );
+}
+
