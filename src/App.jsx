@@ -485,14 +485,23 @@ function Organismi({ filtroRegionePre }) {
   const [filtroAmbito, setFiltroAmbito] = useState("tutti");
   const [filtroFonte, setFiltroFonte] = useState("tutti");
   const [filtroRegione, setFiltroRegione] = useState("tutte");
+  const [filtroProvincia, setFiltroProvincia] = useState("tutte");
   const [filtroComune, setFiltroComune] = useState("tutti");
   const [selected, setSelected] = useState(null);
 
   const ambiti = ["tutti", ...new Set(organismi.flatMap(o => o.ambiti).filter(Boolean).sort())];
   const regioni = ["tutte", ...new Set(organismi.map(o => o.regione).filter(Boolean).sort())];
+  const provinceDisponibili = ["tutte", ...new Set(
+    organismi
+      .filter(o => filtroRegione === "tutte" || o.regione === filtroRegione)
+      .map(o => o.sigla_provincia)
+      .filter(Boolean)
+      .sort()
+  )];
   const comuniDisponibili = ["tutti", ...new Set(
     organismi
       .filter(o => filtroRegione === "tutte" || o.regione === filtroRegione)
+      .filter(o => filtroProvincia === "tutte" || o.sigla_provincia === filtroProvincia)
       .map(o => o.comune)
       .filter(Boolean)
       .sort()
@@ -504,6 +513,7 @@ function Organismi({ filtroRegionePre }) {
     (filtroAmbito === "tutti" || o.ambiti.includes(filtroAmbito)) &&
     (filtroFonte === "tutti" || o.fonti.includes(filtroFonte)) &&
     (filtroRegione === "tutte" || o.regione === filtroRegione) &&
+    (filtroProvincia === "tutte" || o.sigla_provincia === filtroProvincia) &&
     (filtroComune === "tutti" || o.comune === filtroComune)
   );
 
@@ -527,8 +537,11 @@ function Organismi({ filtroRegionePre }) {
           <input value={cercaCF} onChange={e => setCercaCF(e.target.value)} placeholder="Cerca per CF…"
             style={{ ...sel, paddingLeft: 30, width: 150, ...mono }} />
         </div>
-        <select value={filtroRegione} onChange={e => { setFiltroRegione(e.target.value); setFiltroComune("tutti"); }} style={sel}>
+        <select value={filtroRegione} onChange={e => { setFiltroRegione(e.target.value); setFiltroProvincia("tutte"); setFiltroComune("tutti"); }} style={sel}>
           {regioni.map(r => <option key={r} value={r}>{r === "tutte" ? "Tutte le regioni" : r}</option>)}
+        </select>
+        <select value={filtroProvincia} onChange={e => { setFiltroProvincia(e.target.value); setFiltroComune("tutti"); }} style={sel} disabled={provinceDisponibili.length <= 1}>
+          {provinceDisponibili.map(p => <option key={p} value={p}>{p === "tutte" ? "Tutte le provincie" : p}</option>)}
         </select>
         <select value={filtroComune} onChange={e => setFiltroComune(e.target.value)} style={sel} disabled={comuniDisponibili.length <= 1}>
           {comuniDisponibili.map(c => <option key={c} value={c}>{c === "tutti" ? "Tutti i comuni" : c}</option>)}
@@ -779,7 +792,6 @@ function generaReportHTML(organismi) {
   const fmt2 = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
   const oggi = new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
 
-  // Per ogni organismo, calcola totale per anno E per fonte (MIC vs Regione Puglia)
   const righe = organismi.map(o => {
     const mic = { 2025: 0, 2026: 0, 2027: 0 };
     const reg = { 2025: 0, 2026: 0, 2027: 0 };
@@ -789,7 +801,7 @@ function generaReportHTML(organismi) {
     });
     const totale2025 = mic[2025] + reg[2025];
     const totale2026 = mic[2026] + reg[2026];
-    const varMic = mic[2025] > 0 ? ((mic[2026] - mic[2025]) / mic[2025]) * 100 : (mic[2026] > 0 ? null : null);
+    const varMic = mic[2025] > 0 ? ((mic[2026] - mic[2025]) / mic[2025]) * 100 : null;
     const varReg = reg[2025] > 0 ? ((reg[2026] - reg[2025]) / reg[2025]) * 100 : null;
     return { ...o, mic, reg, totale2025, totale2026, varMic, varReg };
   }).sort((a, b) => (b.totale2025 + b.totale2026) - (a.totale2025 + a.totale2026));
@@ -802,69 +814,24 @@ function generaReportHTML(organismi) {
   const varRegTotale = regTot2025 > 0 ? ((regTot2026 - regTot2025) / regTot2025) * 100 : 0;
 
   const variazioneTag = (v) => {
-    if (v === null) return '<span style="color:#94A3B8;">—</span>';
+    if (v === null) return '<span style="color:#94A3B8;">&mdash;</span>';
     const color = v >= 0 ? "#059669" : "#DC2626";
-    const icona = v >= 0 ? "▲" : "▼";
+    const icona = v >= 0 ? "&#9650;" : "&#9660;";
     return `<span style="color:${color};font-weight:700;">${icona} ${v>=0?'+':''}${v.toFixed(1)}%</span>`;
   };
 
   const righeHTML = righe.map(r => `
       <tr>
-        <td style="padding:7px 9px;font-weight:700;color:#0F172A;border-bottom:1px solid #E2E8F0;font-size:10px;">${r.denominazione}</td>
-        <td style="padding:7px 9px;color:#64748B;font-size:9px;border-bottom:1px solid #E2E8F0;">${r.comune || '—'}</td>
-        <td style="padding:7px 8px;text-align:right;font-family:monospace;color:#1D4ED8;font-size:10px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${r.mic[2025] > 0 ? fmt2(r.mic[2025]) : '—'}</td>
-        <td style="padding:7px 8px;text-align:right;font-family:monospace;color:#1D4ED8;font-size:10px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${r.mic[2026] > 0 ? fmt2(r.mic[2026]) : '—'}</td>
-        <td style="padding:7px 8px;text-align:right;font-size:9px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${variazioneTag(r.varMic)}</td>
-        <td style="padding:7px 8px;text-align:right;font-family:monospace;color:#C2410C;font-size:10px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${r.reg[2025] > 0 ? fmt2(r.reg[2025]) : '—'}</td>
-        <td style="padding:7px 8px;text-align:right;font-family:monospace;color:#C2410C;font-size:10px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${r.reg[2026] > 0 ? fmt2(r.reg[2026]) : '—'}</td>
-        <td style="padding:7px 8px;text-align:right;font-size:9px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${variazioneTag(r.varReg)}</td>
-        <td style="padding:7px 9px;text-align:right;font-family:monospace;font-weight:800;color:#065F46;font-size:10px;border-bottom:1px solid #E2E8F0;">${fmt2(r.totale2025 + r.totale2026)}</td>
+        <td style="padding:11px 12px;font-weight:700;color:#0F172A;border-bottom:1px solid #E2E8F0;font-size:13px;">${r.denominazione}</td>
+        <td style="padding:11px 12px;color:#64748B;font-size:12px;border-bottom:1px solid #E2E8F0;">${r.comune || '&mdash;'}</td>
+        <td style="padding:11px 10px;text-align:right;font-family:monospace;color:#1D4ED8;font-size:13px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${r.mic[2025] > 0 ? fmt2(r.mic[2025]) : '&mdash;'}</td>
+        <td style="padding:11px 10px;text-align:right;font-family:monospace;color:#1D4ED8;font-size:13px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${r.mic[2026] > 0 ? fmt2(r.mic[2026]) : '&mdash;'}</td>
+        <td style="padding:11px 10px;text-align:right;font-size:12px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">${variazioneTag(r.varMic)}</td>
+        <td style="padding:11px 10px;text-align:right;font-family:monospace;color:#C2410C;font-size:13px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${r.reg[2025] > 0 ? fmt2(r.reg[2025]) : '&mdash;'}</td>
+        <td style="padding:11px 10px;text-align:right;font-family:monospace;color:#C2410C;font-size:13px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${r.reg[2026] > 0 ? fmt2(r.reg[2026]) : '&mdash;'}</td>
+        <td style="padding:11px 10px;text-align:right;font-size:12px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">${variazioneTag(r.varReg)}</td>
+        <td style="padding:11px 12px;text-align:right;font-family:monospace;font-weight:800;color:#065F46;font-size:13px;border-bottom:1px solid #E2E8F0;">${fmt2(r.totale2025 + r.totale2026)}</td>
       </tr>`).join('');
-
-  // Grafico: top 12 per fonte separata
-  const top12 = righe.slice(0, 12);
-  const maxValMic = Math.max(...top12.map(r => Math.max(r.mic[2025], r.mic[2026])), 1);
-  const maxValReg = Math.max(...top12.map(r => Math.max(r.reg[2025], r.reg[2026])), 1);
-
-  const barreHTML = top12.map(r => {
-    const nomeShort = r.denominazione.length > 34 ? r.denominazione.slice(0, 32) + '…' : r.denominazione;
-    const pctMic25 = (r.mic[2025] / maxValMic) * 100;
-    const pctMic26 = (r.mic[2026] / maxValMic) * 100;
-    const pctReg25 = (r.reg[2025] / maxValReg) * 100;
-    const pctReg26 = (r.reg[2026] / maxValReg) * 100;
-    return `
-      <div style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9;">
-        <div style="font-size:10px;color:#0F172A;font-weight:700;margin-bottom:5px;">${nomeShort}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div>
-            <div style="font-size:7px;color:#1D4ED8;font-weight:700;text-transform:uppercase;margin-bottom:2px;">MIC · FNSV</div>
-            <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;">
-              <span style="font-size:7px;color:#94A3B8;width:24px;">25</span>
-              <div style="flex:1;height:7px;background:#EFF6FF;border-radius:2px;overflow:hidden;"><div style="width:${pctMic25}%;height:100%;background:#1D4ED8;"></div></div>
-              <span style="font-size:7px;color:#1D4ED8;font-family:monospace;width:62px;text-align:right;">${fmt2(r.mic[2025])}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <span style="font-size:7px;color:#94A3B8;width:24px;">26</span>
-              <div style="flex:1;height:7px;background:#EFF6FF;border-radius:2px;overflow:hidden;"><div style="width:${pctMic26}%;height:100%;background:#3B82F6;"></div></div>
-              <span style="font-size:7px;color:#1D4ED8;font-family:monospace;width:62px;text-align:right;">${fmt2(r.mic[2026])}</span>
-            </div>
-          </div>
-          <div>
-            <div style="font-size:7px;color:#C2410C;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Regione Puglia</div>
-            <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;">
-              <span style="font-size:7px;color:#94A3B8;width:24px;">25</span>
-              <div style="flex:1;height:7px;background:#FFF7ED;border-radius:2px;overflow:hidden;"><div style="width:${pctReg25}%;height:100%;background:#C2410C;"></div></div>
-              <span style="font-size:7px;color:#C2410C;font-family:monospace;width:62px;text-align:right;">${r.reg[2025]>0?fmt2(r.reg[2025]):'—'}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <span style="font-size:7px;color:#94A3B8;width:24px;">26</span>
-              <div style="flex:1;height:7px;background:#FFF7ED;border-radius:2px;overflow:hidden;"><div style="width:${pctReg26}%;height:100%;background:#F97316;"></div></div>
-              <span style="font-size:7px;color:#C2410C;font-family:monospace;width:62px;text-align:right;">${r.reg[2026]>0?fmt2(r.reg[2026]):'—'}</span>
-            </div>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
 
   return `<!DOCTYPE html>
 <html lang="it">
@@ -872,32 +839,32 @@ function generaReportHTML(organismi) {
 <meta charset="UTF-8">
 <title>Report Puglia e Basilicata - Confronto MIC e Regione Puglia</title>
 <style>
-  @page { margin: 16mm 12mm; }
+  @page { margin: 14mm 10mm; size: A4 landscape; }
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; color: #0F172A; margin: 0; padding: 0; }
-  .header { background: linear-gradient(135deg,#0A1628,#1E3A5F); color: white; padding: 22px 26px; margin-bottom: 18px; }
-  .header .sub { font-size: 9px; color: #F0C040; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin-bottom: 6px; }
-  .header h1 { font-size: 20px; margin: 0; font-weight: 900; }
-  .header p { font-size: 10px; color: rgba(255,255,255,0.6); margin: 6px 0 0; }
-  .kpi-row { display: flex; gap: 10px; margin-bottom: 20px; }
-  .kpi { flex: 1; background: #F8FAFC; border: 1px solid #E2E8F0; border-top: 3px solid #1D4ED8; border-radius: 6px; padding: 10px 12px; }
-  .kpi .label { font-size: 8px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 5px; }
-  .kpi .value { font-size: 15px; font-weight: 900; font-family: monospace; }
-  .section-title { font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 1.5px; margin: 20px 0 10px; border-bottom: 2px solid #E2E8F0; padding-bottom: 5px; }
+  .header { background: linear-gradient(135deg,#0A1628,#1E3A5F); color: white; padding: 26px 30px; margin-bottom: 20px; }
+  .header .sub { font-size: 11px; color: #F0C040; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin-bottom: 8px; }
+  .header h1 { font-size: 24px; margin: 0; font-weight: 900; }
+  .header p { font-size: 12px; color: rgba(255,255,255,0.6); margin: 8px 0 0; }
+  .kpi-row { display: flex; gap: 12px; margin-bottom: 24px; }
+  .kpi { flex: 1; background: #F8FAFC; border: 1px solid #E2E8F0; border-top: 3px solid #1D4ED8; border-radius: 6px; padding: 14px 16px; }
+  .kpi .label { font-size: 10px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 7px; }
+  .kpi .value { font-size: 19px; font-weight: 900; font-family: monospace; }
+  .section-title { font-size: 13px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 1.5px; margin: 24px 0 12px; border-bottom: 2px solid #E2E8F0; padding-bottom: 7px; }
   table { width: 100%; border-collapse: collapse; }
-  thead th { background: #0A1628; color: white; padding: 7px 8px; text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
-  .footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #E2E8F0; font-size: 8px; color: #94A3B8; display: flex; justify-content: space-between; }
+  thead th { background: #0A1628; color: white; padding: 11px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 10px; color: #94A3B8; display: flex; justify-content: space-between; }
   @media print { .no-print { display: none; } table { page-break-inside: auto; } tr { page-break-inside: avoid; } }
 </style>
 </head>
 <body>
   <div class="header">
-    <div class="sub">AGIS Puglia e Basilicata · Gestionale Contributi Spettacolo dal Vivo</div>
-    <h1>Report Puglia &amp; Basilicata — MIC/FNSV e Regione Puglia · 2025/2026</h1>
-    <p>Generato il ${oggi} · ${righe.length} organismi</p>
+    <div class="sub">AGIS Puglia e Basilicata &middot; Gestionale Contributi Spettacolo dal Vivo</div>
+    <h1>Report Puglia &amp; Basilicata &mdash; MIC/FNSV e Regione Puglia &middot; 2025/2026</h1>
+    <p>Generato il ${oggi} &middot; ${righe.length} organismi</p>
   </div>
 
-  <div style="padding:0 4px;">
+  <div style="padding:0 6px;">
     <div class="kpi-row">
       <div class="kpi"><div class="label">MIC 2025</div><div class="value" style="color:#1D4ED8;">${fmt2(micTot2025)}</div></div>
       <div class="kpi"><div class="label">MIC 2026</div><div class="value" style="color:#1D4ED8;">${fmt2(micTot2026)}</div></div>
@@ -907,18 +874,13 @@ function generaReportHTML(organismi) {
       <div class="kpi" style="border-top-color:${varRegTotale>=0?'#059669':'#DC2626'};"><div class="label">Var. Reg. Puglia</div><div class="value" style="color:${varRegTotale>=0?'#059669':'#DC2626'};">${varRegTotale>=0?'+':''}${varRegTotale.toFixed(1)}%</div></div>
     </div>
 
-    <div class="section-title">📊 Top 12 organismi — MIC vs Regione Puglia, confronto 2025/2026</div>
-    <div style="background:#FAFAFA;border:1px solid #E2E8F0;border-radius:6px;padding:14px;">
-      ${barreHTML}
-    </div>
-
-    <div class="section-title">📋 Elenco completo — MIC e Regione Puglia separati</div>
+    <div class="section-title">Elenco completo &mdash; MIC e Regione Puglia separati</div>
     <table>
       <thead>
         <tr>
           <th rowspan="2" style="vertical-align:bottom;">Organismo</th>
           <th rowspan="2" style="vertical-align:bottom;">Sede</th>
-          <th colspan="3" style="text-align:center;background:#1E3A8A;">MIC · FNSV</th>
+          <th colspan="3" style="text-align:center;background:#1E3A8A;">MIC &middot; FNSV</th>
           <th colspan="3" style="text-align:center;background:#9A3412;">Regione Puglia</th>
           <th rowspan="2" style="text-align:right;vertical-align:bottom;">Totale</th>
         </tr>
@@ -936,29 +898,71 @@ function generaReportHTML(organismi) {
       </tbody>
       <tfoot>
         <tr style="background:#F1F5F9;font-weight:800;">
-          <td colspan="2" style="padding:9px;font-size:10px;">TOTALE</td>
-          <td style="padding:9px;text-align:right;font-family:monospace;font-size:10px;">${fmt2(micTot2025)}</td>
-          <td style="padding:9px;text-align:right;font-family:monospace;font-size:10px;">${fmt2(micTot2026)}</td>
-          <td style="padding:9px;text-align:right;font-size:9px;">${variazioneTag(varMicTotale)}</td>
-          <td style="padding:9px;text-align:right;font-family:monospace;font-size:10px;">${fmt2(regTot2025)}</td>
-          <td style="padding:9px;text-align:right;font-family:monospace;font-size:10px;">${fmt2(regTot2026)}</td>
-          <td style="padding:9px;text-align:right;font-size:9px;">${variazioneTag(varRegTotale)}</td>
-          <td style="padding:9px;text-align:right;font-family:monospace;font-size:11px;color:#065F46;">${fmt2(micTot2025+micTot2026+regTot2025+regTot2026)}</td>
+          <td colspan="2" style="padding:12px;font-size:13px;">TOTALE</td>
+          <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px;">${fmt2(micTot2025)}</td>
+          <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px;">${fmt2(micTot2026)}</td>
+          <td style="padding:12px;text-align:right;font-size:12px;">${variazioneTag(varMicTotale)}</td>
+          <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px;">${fmt2(regTot2025)}</td>
+          <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px;">${fmt2(regTot2026)}</td>
+          <td style="padding:12px;text-align:right;font-size:12px;">${variazioneTag(varRegTotale)}</td>
+          <td style="padding:12px;text-align:right;font-family:monospace;font-size:14px;color:#065F46;">${fmt2(micTot2025+micTot2026+regTot2025+regTot2026)}</td>
         </tr>
       </tfoot>
     </table>
 
     <div class="footer">
-      <span>AGIS Puglia e Basilicata · Gestionale Contributi · Dati MIC / DG Spettacolo e Regione Puglia</span>
+      <span>AGIS Puglia e Basilicata &middot; Gestionale Contributi &middot; Dati MIC / DG Spettacolo e Regione Puglia</span>
       <span>Report generato automaticamente</span>
     </div>
   </div>
 
-  <div class="no-print" style="text-align:center;margin-top:20px;">
-    <button onclick="window.print()" style="padding:10px 24px;background:#1D4ED8;color:white;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">🖨️ Stampa / Salva PDF</button>
+  <div class="no-print" style="text-align:center;margin-top:24px;">
+    <button onclick="window.print()" style="padding:11px 26px;background:#1D4ED8;color:white;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;">Stampa / Salva PDF</button>
   </div>
 </body>
 </html>`;
+}
+
+function esportaExcel(organismi) {
+  const righe = organismi.map(o => {
+    const mic = { 2025: 0, 2026: 0, 2027: 0 };
+    const reg = { 2025: 0, 2026: 0, 2027: 0 };
+    o.assegnazioni.forEach(a => {
+      const target = a.tipo_decreto === "REG_PU" ? reg : mic;
+      if (target[a.anno] !== undefined) target[a.anno] += (a.contributo_assegnato || 0);
+    });
+    return { ...o, mic, reg };
+  }).sort((a, b) => (b.mic[2025]+b.mic[2026]+b.reg[2025]+b.reg[2026]) - (a.mic[2025]+a.mic[2026]+a.reg[2025]+a.reg[2026]));
+
+  const header = ["Organismo","CF","Sede","Provincia","MIC 2025","MIC 2026","Var. MIC %","Reg. Puglia 2025","Reg. Puglia 2026","Var. Reg.Puglia %","Totale"];
+  const rows = righe.map(r => {
+    const varMic = r.mic[2025] > 0 ? (((r.mic[2026]-r.mic[2025])/r.mic[2025])*100).toFixed(1) : "";
+    const varReg = r.reg[2025] > 0 ? (((r.reg[2026]-r.reg[2025])/r.reg[2025])*100).toFixed(1) : "";
+    return [
+      r.denominazione, r.codice_fiscale || "", r.comune || "", r.sigla_provincia || "",
+      r.mic[2025].toFixed(2), r.mic[2026].toFixed(2), varMic,
+      r.reg[2025].toFixed(2), r.reg[2026].toFixed(2), varReg,
+      (r.mic[2025]+r.mic[2026]+r.reg[2025]+r.reg[2026]).toFixed(2)
+    ];
+  });
+
+  const csvLines = [header, ...rows].map(row =>
+    row.map(cell => {
+      const s = String(cell).replace(/"/g, '""');
+      return /[;",\n]/.test(s) ? `"${s}"` : s;
+    }).join(";")
+  );
+  const csvContent = "\uFEFF" + csvLines.join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const oggi = new Date().toISOString().slice(0,10);
+  link.href = url;
+  link.download = `report_puglia_basilicata_${oggi}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function PugliaBasilicata() {
@@ -990,9 +994,14 @@ function PugliaBasilicata() {
             <h1 style={{ fontSize: 26, fontWeight: 900, color: "#FFFFFF", margin: "0 0 6px", ...serif }}>Puglia <span style={{ color: "#FED7AA" }}>&</span> Basilicata</h1>
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", margin: 0 }}>Contributi MIC/FNSV e Regione Puglia · {organismi.length} organismi</p>
           </div>
-          <button onClick={apriReport} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", padding: "10px 18px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-            📄 Genera Report Confronto Annuale
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={apriReport} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", padding: "10px 18px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              📄 Genera Report
+            </button>
+            <button onClick={() => esportaExcel(organismi)} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", padding: "10px 18px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              📊 Esporta Excel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1026,102 +1035,3 @@ function PugliaBasilicata() {
   );
 }
 
-// ── DECRETI ───────────────────────────────────────────────────
-function Decreti() {
-  const [dati, setDati] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [decretoSel, setDecretoSel] = useState(null);
-  const [assegnazioni, setAssegnazioni] = useState([]);
-  const [loadingAss, setLoadingAss] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const { organismi } = useOrganismi();
-
-  useEffect(() => {
-    supabase.schema("contributi_mic").from("decreti").select("*, ambito:ambito_id(nome)").order("anno_finanziario", { ascending: false }).order("data", { ascending: false })
-      .then(({ data }) => { setDati(data || []); setLoading(false); });
-  }, []);
-
-  async function apriDecreto(d) {
-    if (decretoSel?.id === d.id) { setDecretoSel(null); setAssegnazioni([]); return; }
-    setDecretoSel(d);
-    setLoadingAss(true);
-    const { data } = await supabase.schema("contributi_mic").from("v_assegnazioni").select("*")
-      .eq("numero_rep", d.numero_rep).eq("anno", d.anno_finanziario)
-      .order("contributo_assegnato", { ascending: false });
-    // Aggrega per organismo
-    const map = {};
-    for (const a of (data || [])) {
-      const key = a.id_organismo;
-      if (!map[key]) {
-        map[key] = { ...a, id: key, ambiti: new Set(), anni: new Set(), fonti: new Set(), totale: 0, assegnazioni: [] };
-      }
-      map[key].ambiti.add(a.ambito);
-      map[key].anni.add(a.anno);
-      map[key].fonti.add(a.tipo_decreto);
-      map[key].totale += a.contributo_assegnato || 0;
-      map[key].assegnazioni.push(a);
-    }
-    setAssegnazioni(Object.values(map).map(o => ({ ...o, ambiti: [...o.ambiti], anni: [...o.anni], fonti: [...o.fonti] })));
-    setLoadingAss(false);
-  }
-
-  if (loading) return <div style={{ padding: 48, color: T.muted }}>Caricamento…</div>;
-
-  return (
-    <div style={{ padding: "28px 36px" }}>
-      {selected && <SchedaOrganismo org={selected} onClose={() => setSelected(null)} />}
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 900, color: T.testo, margin: 0 }}>Decreti importati</h1>
-        <p style={{ fontSize: 12, color: T.muted, margin: "5px 0 0" }}>Clicca un decreto per vedere gli organismi finanziati</p>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {dati.map(d => (
-          <div key={d.id}>
-            <div onClick={() => apriDecreto(d)} style={{ background: T.bianco, border: `1px solid ${decretoSel?.id === d.id ? T.marino : T.bordo}`, borderLeft: `4px solid ${T.oro}`, borderRadius: 8, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", transition: "border-color 0.15s" }}>
-              <div style={{ background: T.inchiostro, color: "#FFFFFF", borderRadius: 6, padding: "8px 14px", textAlign: "center", flexShrink: 0, ...mono }}>
-                <div style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>REP.</div>
-                <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1 }}>{d.numero_rep?.slice(0,10)}</div>
-                <div style={{ fontSize: 9, color: T.oro, marginTop: 2 }}>{d.anno_finanziario}</div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: T.testo }}>{d.ambito?.nome}</span>
-                  <BadgeTipo tipo={d.tipo} />
-                </div>
-                <div style={{ fontSize: 11, color: T.sub, fontWeight: 500 }}>{d.ente_erogante} · {d.data}</div>
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: "#065F46", ...mono }}>{fmt(d.stanziamento_totale)}</div>
-              <div style={{ fontSize: 16, color: T.muted, marginLeft: 8 }}>{decretoSel?.id === d.id ? "▲" : "▼"}</div>
-            </div>
-            {decretoSel?.id === d.id && (
-              <div style={{ border: `1px solid ${T.bordo}`, borderTop: "none", borderRadius: "0 0 8px 8px", background: T.sfondo, padding: 16 }}>
-                {loadingAss ? <div style={{ padding: 20, color: T.muted }}>Caricamento…</div> :
-                  <TabellaOrganismi organismi={assegnazioni} onSelect={setSelected} />
-                }
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── APP ───────────────────────────────────────────────────────
-export default function App() {
-  const [sezione, setSezione] = useState("dashboard");
-  const contenuto = {
-    dashboard:         <Dashboard />,
-    organismi:         <div style={{ padding: "22px 36px" }}><div style={{ marginBottom: 18 }}><h1 style={{ fontSize: 22, fontWeight: 900, color: T.testo, margin: 0 }}>Organismi</h1><p style={{ fontSize: 12, color: T.muted, margin: "4px 0 0" }}>Anagrafica completa · Clicca un organismo per vedere tutte le sue assegnazioni</p></div><Organismi /></div>,
-    puglia_basilicata: <PugliaBasilicata />,
-    decreti:           <Decreti />,
-    parser:            <ParserDecreto />,
-  }[sezione];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Segoe UI', system-ui, sans-serif", background: T.sfondo }}>
-      <Topbar sezione={sezione} setSezione={setSezione} />
-      <main style={{ flex: 1, overflow: "auto" }}>{contenuto}</main>
-    </div>
-  );
-}
