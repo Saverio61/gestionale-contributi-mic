@@ -792,19 +792,26 @@ function generaReportHTML(organismi) {
   const fmt2 = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
   const oggi = new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
 
+  // Solo decreti FNSV "madre" — esclude bandi speciali (Periferie, Progetti Speciali, Tournée Estero)
+  const DECRETI_MADRE_FNSV = ['1125','855','1291','1074','787','1137','770','1173','783'];
+
   const righe = organismi.map(o => {
     const mic = { 2025: 0, 2026: 0, 2027: 0 };
     const reg = { 2025: 0, 2026: 0, 2027: 0 };
     o.assegnazioni.forEach(a => {
-      const target = a.tipo_decreto === "REG_PU" ? reg : mic;
-      if (target[a.anno] !== undefined) target[a.anno] += (a.contributo_assegnato || 0);
+      if (a.tipo_decreto === "REG_PU") {
+        if (reg[a.anno] !== undefined) reg[a.anno] += (a.contributo_assegnato || 0);
+      } else if (DECRETI_MADRE_FNSV.includes(String(a.numero_rep))) {
+        if (mic[a.anno] !== undefined) mic[a.anno] += (a.contributo_assegnato || 0);
+      }
     });
     const totale2025 = mic[2025] + reg[2025];
     const totale2026 = mic[2026] + reg[2026];
     const varMic = mic[2025] > 0 ? ((mic[2026] - mic[2025]) / mic[2025]) * 100 : null;
     const varReg = reg[2025] > 0 ? ((reg[2026] - reg[2025]) / reg[2025]) * 100 : null;
     return { ...o, mic, reg, totale2025, totale2026, varMic, varReg };
-  }).sort((a, b) => (b.totale2025 + b.totale2026) - (a.totale2025 + a.totale2026));
+  }).filter(r => r.totale2025 > 0 || r.totale2026 > 0)
+    .sort((a, b) => (b.totale2025 + b.totale2026) - (a.totale2025 + a.totale2026));
 
   const micTot2025 = righe.reduce((s, r) => s + r.mic[2025], 0);
   const micTot2026 = righe.reduce((s, r) => s + r.mic[2026], 0);
@@ -860,8 +867,8 @@ function generaReportHTML(organismi) {
 <body>
   <div class="header">
     <div class="sub">AGIS Puglia e Basilicata &middot; Gestionale Contributi Spettacolo dal Vivo</div>
-    <h1>Report Puglia &amp; Basilicata &mdash; MIC/FNSV e Regione Puglia &middot; 2025/2026</h1>
-    <p>Generato il ${oggi} &middot; ${righe.length} organismi</p>
+    <h1>Report Puglia &amp; Basilicata &mdash; Decreti Madre FNSV e Regione Puglia &middot; 2025/2026</h1>
+    <p>Generato il ${oggi} &middot; ${righe.length} organismi &middot; Esclusi bandi speciali (Periferie, Progetti Speciali, Tourn&eacute;e Estero)</p>
   </div>
 
   <div style="padding:0 6px;">
@@ -924,15 +931,21 @@ function generaReportHTML(organismi) {
 }
 
 function esportaExcel(organismi) {
+  const DECRETI_MADRE_FNSV = ['1125','855','1291','1074','787','1137','770','1173','783'];
+
   const righe = organismi.map(o => {
     const mic = { 2025: 0, 2026: 0, 2027: 0 };
     const reg = { 2025: 0, 2026: 0, 2027: 0 };
     o.assegnazioni.forEach(a => {
-      const target = a.tipo_decreto === "REG_PU" ? reg : mic;
-      if (target[a.anno] !== undefined) target[a.anno] += (a.contributo_assegnato || 0);
+      if (a.tipo_decreto === "REG_PU") {
+        if (reg[a.anno] !== undefined) reg[a.anno] += (a.contributo_assegnato || 0);
+      } else if (DECRETI_MADRE_FNSV.includes(String(a.numero_rep))) {
+        if (mic[a.anno] !== undefined) mic[a.anno] += (a.contributo_assegnato || 0);
+      }
     });
     return { ...o, mic, reg };
-  }).sort((a, b) => (b.mic[2025]+b.mic[2026]+b.reg[2025]+b.reg[2026]) - (a.mic[2025]+a.mic[2026]+a.reg[2025]+a.reg[2026]));
+  }).filter(r => r.mic[2025]+r.mic[2026]+r.reg[2025]+r.reg[2026] > 0)
+    .sort((a, b) => (b.mic[2025]+b.mic[2026]+b.reg[2025]+b.reg[2026]) - (a.mic[2025]+a.mic[2026]+a.reg[2025]+a.reg[2026]));
 
   // Formatta numero in stile italiano (virgola decimale, niente separatore migliaia per compatibilità CSV)
   const numIT = (n) => n.toFixed(2).replace(".", ",");
