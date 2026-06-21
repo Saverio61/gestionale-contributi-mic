@@ -934,22 +934,27 @@ function esportaExcel(organismi) {
     return { ...o, mic, reg };
   }).sort((a, b) => (b.mic[2025]+b.mic[2026]+b.reg[2025]+b.reg[2026]) - (a.mic[2025]+a.mic[2026]+a.reg[2025]+a.reg[2026]));
 
+  // Formatta numero in stile italiano (virgola decimale, niente separatore migliaia per compatibilità CSV)
+  const numIT = (n) => n.toFixed(2).replace(".", ",");
+
   const header = ["Organismo","CF","Sede","Provincia","MIC 2025","MIC 2026","Var. MIC %","Reg. Puglia 2025","Reg. Puglia 2026","Var. Reg.Puglia %","Totale"];
   const rows = righe.map(r => {
-    const varMic = r.mic[2025] > 0 ? (((r.mic[2026]-r.mic[2025])/r.mic[2025])*100).toFixed(1) : "";
-    const varReg = r.reg[2025] > 0 ? (((r.reg[2026]-r.reg[2025])/r.reg[2025])*100).toFixed(1) : "";
+    const varMic = r.mic[2025] > 0 ? (((r.mic[2026]-r.mic[2025])/r.mic[2025])*100).toFixed(1).replace(".", ",") : "";
+    const varReg = r.reg[2025] > 0 ? (((r.reg[2026]-r.reg[2025])/r.reg[2025])*100).toFixed(1).replace(".", ",") : "";
+    // CF con prefisso ="..." forza Excel a trattarlo come testo, preservando lo zero iniziale
+    const cfTesto = r.codice_fiscale ? `="${r.codice_fiscale.trim()}"` : "";
     return [
-      r.denominazione, r.codice_fiscale || "", r.comune || "", r.sigla_provincia || "",
-      r.mic[2025].toFixed(2), r.mic[2026].toFixed(2), varMic,
-      r.reg[2025].toFixed(2), r.reg[2026].toFixed(2), varReg,
-      (r.mic[2025]+r.mic[2026]+r.reg[2025]+r.reg[2026]).toFixed(2)
+      r.denominazione, cfTesto, r.comune || "", r.sigla_provincia || "",
+      numIT(r.mic[2025]), numIT(r.mic[2026]), varMic,
+      numIT(r.reg[2025]), numIT(r.reg[2026]), varReg,
+      numIT(r.mic[2025]+r.mic[2026]+r.reg[2025]+r.reg[2026])
     ];
   });
 
   const csvLines = [header, ...rows].map(row =>
     row.map(cell => {
       const s = String(cell).replace(/"/g, '""');
-      return /[;",\n]/.test(s) ? `"${s}"` : s;
+      return /[;",\n]/.test(s) && !s.startsWith('="') ? `"${s}"` : s;
     }).join(";")
   );
   const csvContent = "\uFEFF" + csvLines.join("\r\n");
@@ -1132,4 +1137,3 @@ export default function App() {
     </div>
   );
 }
-
