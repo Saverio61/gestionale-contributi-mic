@@ -788,14 +788,13 @@ function Dashboard() {
 }
 
 // ── PUGLIA & BASILICATA ───────────────────────────────────────
-function generaReportHTML(organismi, modalita = "entrambi") {
+function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
   const fmt2 = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
   const oggi = new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
 
   const mostraMic = modalita === "entrambi" || modalita === "solo_mic";
   const mostraReg = modalita === "entrambi" || modalita === "solo_reg";
 
-  // Solo decreti FNSV "madre" — esclude bandi speciali (Periferie, Progetti Speciali, Tournée Estero)
   const DECRETI_MADRE_FNSV = ['1125','855','1291','1074','787','1137','770','1173','783'];
 
   const righe = organismi.map(o => {
@@ -827,150 +826,168 @@ function generaReportHTML(organismi, modalita = "entrambi") {
   const varMicTotale = micTot2025 > 0 ? ((micTot2026 - micTot2025) / micTot2025) * 100 : 0;
   const varRegTotale = regTot2025 > 0 ? ((regTot2026 - regTot2025) / regTot2025) * 100 : 0;
 
-  const variazioneTag = (v) => {
-    if (v === null) return '<span style="color:#94A3B8;">&mdash;</span>';
+  const VarTag = ({ v }) => {
+    if (v === null) return <span style={{ color: "#94A3B8" }}>—</span>;
     const color = v >= 0 ? "#059669" : "#DC2626";
-    const icona = v >= 0 ? "&#9650;" : "&#9660;";
-    return `<span style="color:${color};font-weight:700;">${icona} ${v>=0?'+':''}${v.toFixed(1)}%</span>`;
+    const icona = v >= 0 ? "▲" : "▼";
+    return <span style={{ color, fontWeight: 700 }}>{icona} {v>=0?'+':''}{v.toFixed(1)}%</span>;
   };
 
-  const colMic = mostraMic ? `
-        <td style="padding:11px 10px;text-align:right;font-family:monospace;color:#1D4ED8;font-size:13px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">__MIC25__</td>
-        <td style="padding:11px 10px;text-align:right;font-family:monospace;color:#1D4ED8;font-size:13px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">__MIC26__</td>
-        <td style="padding:11px 10px;text-align:right;font-size:12px;border-bottom:1px solid #E2E8F0;background:#EFF6FF;">__VARMIC__</td>` : '';
-  const colReg = mostraReg ? `
-        <td style="padding:11px 10px;text-align:right;font-family:monospace;color:#C2410C;font-size:13px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">__REG25__</td>
-        <td style="padding:11px 10px;text-align:right;font-family:monospace;color:#C2410C;font-size:13px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">__REG26__</td>
-        <td style="padding:11px 10px;text-align:right;font-size:12px;border-bottom:1px solid #E2E8F0;background:#FFF7ED;">__VARREG__</td>` : '';
-
-  const righeHTML = righe.map((r, idx) => {
-    let row = `
-      <tr class="riga-org" data-idx="${idx}" style="cursor:pointer;" onmouseover="this.style.background='#F0F9FF'" onmouseout="this.style.background=''">
-        <td style="padding:11px 12px;font-weight:700;color:#0F172A;border-bottom:1px solid #E2E8F0;font-size:13px;">${r.denominazione} <span style="color:#94A3B8;font-size:10px;">&#8599;</span></td>
-        <td style="padding:11px 12px;color:#64748B;font-size:12px;border-bottom:1px solid #E2E8F0;">${r.comune || '&mdash;'}</td>${colMic}${colReg}
-        <td style="padding:11px 12px;text-align:right;font-family:monospace;font-weight:800;color:#065F46;font-size:13px;border-bottom:1px solid #E2E8F0;">${fmt2(r.totaleRilevante)}</td>
-      </tr>`;
-    row = row.replace('__MIC25__', r.mic[2025] > 0 ? fmt2(r.mic[2025]) : '&mdash;')
-             .replace('__MIC26__', r.mic[2026] > 0 ? fmt2(r.mic[2026]) : '&mdash;')
-             .replace('__VARMIC__', variazioneTag(r.varMic))
-             .replace('__REG25__', r.reg[2025] > 0 ? fmt2(r.reg[2025]) : '&mdash;')
-             .replace('__REG26__', r.reg[2026] > 0 ? fmt2(r.reg[2026]) : '&mdash;')
-             .replace('__VARREG__', variazioneTag(r.varReg));
-    return row;
-  }).join('');
-
-  const theadMic = mostraMic ? `<th style="text-align:right;background:#1E3A8A;">2025</th><th style="text-align:right;background:#1E3A8A;">2026</th><th style="text-align:right;background:#1E3A8A;">Var.</th>` : '';
-  const theadReg = mostraReg ? `<th style="text-align:right;background:#9A3412;">2025</th><th style="text-align:right;background:#9A3412;">2026</th><th style="text-align:right;background:#9A3412;">Var.</th>` : '';
-  const theadGroupMic = mostraMic ? `<th colspan="3" style="text-align:center;background:#1E3A8A;">MIC &middot; FNSV</th>` : '';
-  const theadGroupReg = mostraReg ? `<th colspan="3" style="text-align:center;background:#9A3412;">Regione Puglia</th>` : '';
-
-  const tfootMic = mostraMic ? `
-          <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px;">${fmt2(micTot2025)}</td>
-          <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px;">${fmt2(micTot2026)}</td>
-          <td style="padding:12px;text-align:right;font-size:12px;">${variazioneTag(varMicTotale)}</td>` : '';
-  const tfootReg = mostraReg ? `
-          <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px;">${fmt2(regTot2025)}</td>
-          <td style="padding:12px;text-align:right;font-family:monospace;font-size:13px;">${fmt2(regTot2026)}</td>
-          <td style="padding:12px;text-align:right;font-size:12px;">${variazioneTag(varRegTotale)}</td>` : '';
-
-  const kpiMic = mostraMic ? `
-      <div class="kpi"><div class="label">MIC 2025</div><div class="value" style="color:#1D4ED8;">${fmt2(micTot2025)}</div></div>
-      <div class="kpi"><div class="label">MIC 2026</div><div class="value" style="color:#1D4ED8;">${fmt2(micTot2026)}</div></div>
-      <div class="kpi" style="border-top-color:${varMicTotale>=0?'#059669':'#DC2626'};"><div class="label">Var. MIC</div><div class="value" style="color:${varMicTotale>=0?'#059669':'#DC2626'};">${varMicTotale>=0?'+':''}${varMicTotale.toFixed(1)}%</div></div>` : '';
-  const kpiReg = mostraReg ? `
-      <div class="kpi" style="border-top-color:#C2410C;"><div class="label">Reg. Puglia 2025</div><div class="value" style="color:#C2410C;">${fmt2(regTot2025)}</div></div>
-      <div class="kpi" style="border-top-color:#C2410C;"><div class="label">Reg. Puglia 2026</div><div class="value" style="color:#C2410C;">${fmt2(regTot2026)}</div></div>
-      <div class="kpi" style="border-top-color:${varRegTotale>=0?'#059669':'#DC2626'};"><div class="label">Var. Reg. Puglia</div><div class="value" style="color:${varRegTotale>=0?'#059669':'#DC2626'};">${varRegTotale>=0?'+':''}${varRegTotale.toFixed(1)}%</div></div>` : '';
-
   const titoloModalita = modalita === "solo_mic" ? "Decreti Madre FNSV" : modalita === "solo_reg" ? "Regione Puglia" : "Decreti Madre FNSV e Regione Puglia";
-  const noteModalita = modalita === "entrambi" ? "Esclusi bandi speciali (Periferie, Progetti Speciali, Tourn&eacute;e Estero)" : modalita === "solo_mic" ? "Solo MIC/FNSV &mdash; esclusa Regione Puglia e bandi speciali" : "Solo Regione Puglia &mdash; POC 2021-2027";
+  const noteModalita = modalita === "entrambi" ? "Esclusi bandi speciali (Periferie, Progetti Speciali, Tournée Estero)" : modalita === "solo_mic" ? "Solo MIC/FNSV — esclusa Regione Puglia e bandi speciali" : "Solo Regione Puglia — POC 2021-2027";
 
-  // Dati organismi serializzati per il click (apre scheda nella finestra principale)
-  const datiOrganismiJSON = JSON.stringify(righe.map(r => ({ denominazione: r.denominazione, id_organismo: r.id_organismo || r.id }))).replace(/</g, '\\u003c');
+  function stampa() {
+    window.print();
+  }
 
-  return `<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="UTF-8">
-<title>Report Puglia e Basilicata - ${titoloModalita}</title>
-<style>
-  @page { margin: 14mm 10mm; size: A4 landscape; }
-  * { box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; color: #0F172A; margin: 0; padding: 0; }
-  .header { background: linear-gradient(135deg,#0A1628,#1E3A5F); color: white; padding: 26px 30px; margin-bottom: 20px; }
-  .header .sub { font-size: 11px; color: #F0C040; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin-bottom: 8px; }
-  .header h1 { font-size: 24px; margin: 0; font-weight: 900; }
-  .header p { font-size: 12px; color: rgba(255,255,255,0.6); margin: 8px 0 0; }
-  .kpi-row { display: flex; gap: 12px; margin-bottom: 24px; }
-  .kpi { flex: 1; background: #F8FAFC; border: 1px solid #E2E8F0; border-top: 3px solid #1D4ED8; border-radius: 6px; padding: 14px 16px; }
-  .kpi .label { font-size: 10px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 7px; }
-  .kpi .value { font-size: 19px; font-weight: 900; font-family: monospace; }
-  .section-title { font-size: 13px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 1.5px; margin: 24px 0 12px; border-bottom: 2px solid #E2E8F0; padding-bottom: 7px; }
-  table { width: 100%; border-collapse: collapse; }
-  thead th { background: #0A1628; color: white; padding: 11px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 10px; color: #94A3B8; display: flex; justify-content: space-between; }
-  .riga-org:hover { background: #F0F9FF; }
-  @media print { .no-print { display: none; } table { page-break-inside: auto; } tr { page-break-inside: avoid; } }
-</style>
-</head>
-<body>
-  <div class="header">
-    <div class="sub">AGIS Puglia e Basilicata &middot; Gestionale Contributi Spettacolo dal Vivo</div>
-    <h1>Report Puglia &amp; Basilicata &mdash; ${titoloModalita} &middot; 2025/2026</h1>
-    <p>Generato il ${oggi} &middot; ${righe.length} organismi &middot; ${noteModalita}</p>
-  </div>
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,40,0.85)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="report-print-area" style={{ background: "#FFFFFF", borderRadius: 12, width: "min(1400px, 98vw)", maxHeight: "94vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 40px 100px rgba(0,0,0,0.5)" }}>
 
-  <div style="padding:0 6px;">
-    <div class="kpi-row">${kpiMic}${kpiReg}
+        <style>{`
+          @media print {
+            body * { visibility: hidden; }
+            .report-print-area, .report-print-area * { visibility: visible; }
+            .report-print-area { position: absolute; left: 0; top: 0; width: 100% !important; max-height: none !important; box-shadow: none !important; }
+            .no-print { display: none !important; }
+          }
+        `}</style>
+
+        {/* Header */}
+        <div style={{ background: "linear-gradient(135deg,#0A1628,#1E3A5F)", color: "white", padding: "24px 32px", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#F0C040", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>AGIS Puglia e Basilicata · Gestionale Contributi Spettacolo dal Vivo</div>
+            <h1 style={{ fontSize: 24, margin: 0, fontWeight: 900 }}>Report Puglia &amp; Basilicata — {titoloModalita} · 2025/2026</h1>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", margin: "8px 0 0" }}>Generato il {oggi} · {righe.length} organismi · {noteModalita}</p>
+          </div>
+          <button className="no-print" onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", width: 36, height: 36, borderRadius: 8, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>✕</button>
+        </div>
+
+        {/* Corpo scrollabile */}
+        <div style={{ overflow: "auto", flex: 1, padding: "26px 32px" }}>
+
+          {/* KPI */}
+          <div style={{ display: "flex", gap: 14, marginBottom: 26 }}>
+            {mostraMic && (
+              <>
+                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: "3px solid #1D4ED8", borderRadius: 8, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>MIC 2025</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: "#1D4ED8" }}>{fmt2(micTot2025)}</div>
+                </div>
+                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: "3px solid #1D4ED8", borderRadius: 8, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>MIC 2026</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: "#1D4ED8" }}>{fmt2(micTot2026)}</div>
+                </div>
+                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: `3px solid ${varMicTotale>=0?'#059669':'#DC2626'}`, borderRadius: 8, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Var. MIC</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: varMicTotale>=0?'#059669':'#DC2626' }}>{varMicTotale>=0?'+':''}{varMicTotale.toFixed(1)}%</div>
+                </div>
+              </>
+            )}
+            {mostraReg && (
+              <>
+                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: "3px solid #C2410C", borderRadius: 8, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Reg. Puglia 2025</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: "#C2410C" }}>{fmt2(regTot2025)}</div>
+                </div>
+                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: "3px solid #C2410C", borderRadius: 8, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Reg. Puglia 2026</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: "#C2410C" }}>{fmt2(regTot2026)}</div>
+                </div>
+                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: `3px solid ${varRegTotale>=0?'#059669':'#DC2626'}`, borderRadius: 8, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Var. Reg. Puglia</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: varRegTotale>=0?'#059669':'#DC2626' }}>{varRegTotale>=0?'+':''}{varRegTotale.toFixed(1)}%</div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: 1.5, margin: "0 0 14px", borderBottom: "2px solid #E2E8F0", paddingBottom: 8 }}>
+            Elenco completo — clicca un organismo per il dettaglio assegnazioni
+          </div>
+
+          {/* Tabella */}
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 15 }}>
+            <thead>
+              <tr>
+                <th rowSpan={2} style={{ background: "#0A1628", color: "white", padding: "14px 14px", textAlign: "left", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, verticalAlign: "bottom" }}>Organismo</th>
+                <th rowSpan={2} style={{ background: "#0A1628", color: "white", padding: "14px 14px", textAlign: "left", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, verticalAlign: "bottom" }}>Sede</th>
+                {mostraMic && <th colSpan={3} style={{ background: "#1E3A8A", color: "white", padding: "10px 14px", textAlign: "center", fontSize: 12, textTransform: "uppercase" }}>MIC · FNSV</th>}
+                {mostraReg && <th colSpan={3} style={{ background: "#9A3412", color: "white", padding: "10px 14px", textAlign: "center", fontSize: 12, textTransform: "uppercase" }}>Regione Puglia</th>}
+                <th rowSpan={2} style={{ background: "#0A1628", color: "white", padding: "14px 14px", textAlign: "right", fontSize: 12, textTransform: "uppercase", verticalAlign: "bottom" }}>Totale</th>
+              </tr>
+              <tr>
+                {mostraMic && <>
+                  <th style={{ background: "#1E3A8A", color: "white", padding: "10px 14px", textAlign: "right", fontSize: 12 }}>2025</th>
+                  <th style={{ background: "#1E3A8A", color: "white", padding: "10px 14px", textAlign: "right", fontSize: 12 }}>2026</th>
+                  <th style={{ background: "#1E3A8A", color: "white", padding: "10px 14px", textAlign: "right", fontSize: 12 }}>Var.</th>
+                </>}
+                {mostraReg && <>
+                  <th style={{ background: "#9A3412", color: "white", padding: "10px 14px", textAlign: "right", fontSize: 12 }}>2025</th>
+                  <th style={{ background: "#9A3412", color: "white", padding: "10px 14px", textAlign: "right", fontSize: 12 }}>2026</th>
+                  <th style={{ background: "#9A3412", color: "white", padding: "10px 14px", textAlign: "right", fontSize: 12 }}>Var.</th>
+                </>}
+              </tr>
+            </thead>
+            <tbody>
+              {righe.map((r, i) => (
+                <tr key={r.id || i} onClick={() => onSelectOrg(r)}
+                  style={{ cursor: "pointer", background: i % 2 === 0 ? "#FFFFFF" : "#F8FAFC" }}
+                  onMouseOver={e => e.currentTarget.style.background = "#EFF6FF"}
+                  onMouseOut={e => e.currentTarget.style.background = i % 2 === 0 ? "#FFFFFF" : "#F8FAFC"}>
+                  <td style={{ padding: "13px 14px", fontWeight: 700, color: "#0F172A", fontSize: 15, borderBottom: "1px solid #E2E8F0" }}>{r.denominazione} <span style={{ color: "#94A3B8", fontSize: 12 }}>›</span></td>
+                  <td style={{ padding: "13px 14px", color: "#64748B", fontSize: 14, borderBottom: "1px solid #E2E8F0" }}>{r.comune || "—"}</td>
+                  {mostraMic && <>
+                    <td style={{ padding: "13px 14px", textAlign: "right", fontFamily: "monospace", color: "#1D4ED8", fontSize: 15, borderBottom: "1px solid #E2E8F0", background: "#EFF6FF" }}>{r.mic[2025] > 0 ? fmt2(r.mic[2025]) : "—"}</td>
+                    <td style={{ padding: "13px 14px", textAlign: "right", fontFamily: "monospace", color: "#1D4ED8", fontSize: 15, borderBottom: "1px solid #E2E8F0", background: "#EFF6FF" }}>{r.mic[2026] > 0 ? fmt2(r.mic[2026]) : "—"}</td>
+                    <td style={{ padding: "13px 14px", textAlign: "right", fontSize: 14, borderBottom: "1px solid #E2E8F0", background: "#EFF6FF" }}><VarTag v={r.varMic} /></td>
+                  </>}
+                  {mostraReg && <>
+                    <td style={{ padding: "13px 14px", textAlign: "right", fontFamily: "monospace", color: "#C2410C", fontSize: 15, borderBottom: "1px solid #E2E8F0", background: "#FFF7ED" }}>{r.reg[2025] > 0 ? fmt2(r.reg[2025]) : "—"}</td>
+                    <td style={{ padding: "13px 14px", textAlign: "right", fontFamily: "monospace", color: "#C2410C", fontSize: 15, borderBottom: "1px solid #E2E8F0", background: "#FFF7ED" }}>{r.reg[2026] > 0 ? fmt2(r.reg[2026]) : "—"}</td>
+                    <td style={{ padding: "13px 14px", textAlign: "right", fontSize: 14, borderBottom: "1px solid #E2E8F0", background: "#FFF7ED" }}><VarTag v={r.varReg} /></td>
+                  </>}
+                  <td style={{ padding: "13px 14px", textAlign: "right", fontFamily: "monospace", fontWeight: 800, color: "#065F46", fontSize: 15, borderBottom: "1px solid #E2E8F0" }}>{fmt2(r.totaleRilevante)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ background: "#F1F5F9", fontWeight: 800 }}>
+                <td colSpan={2} style={{ padding: "14px", fontSize: 15 }}>TOTALE</td>
+                {mostraMic && <>
+                  <td style={{ padding: "14px", textAlign: "right", fontFamily: "monospace", fontSize: 15 }}>{fmt2(micTot2025)}</td>
+                  <td style={{ padding: "14px", textAlign: "right", fontFamily: "monospace", fontSize: 15 }}>{fmt2(micTot2026)}</td>
+                  <td style={{ padding: "14px", textAlign: "right", fontSize: 14 }}><VarTag v={varMicTotale} /></td>
+                </>}
+                {mostraReg && <>
+                  <td style={{ padding: "14px", textAlign: "right", fontFamily: "monospace", fontSize: 15 }}>{fmt2(regTot2025)}</td>
+                  <td style={{ padding: "14px", textAlign: "right", fontFamily: "monospace", fontSize: 15 }}>{fmt2(regTot2026)}</td>
+                  <td style={{ padding: "14px", textAlign: "right", fontSize: 14 }}><VarTag v={varRegTotale} /></td>
+                </>}
+                <td style={{ padding: "14px", textAlign: "right", fontFamily: "monospace", fontSize: 16, color: "#065F46" }}>{fmt2((mostraMic?micTot2025+micTot2026:0)+(mostraReg?regTot2025+regTot2026:0))}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div style={{ marginTop: 24, paddingTop: 14, borderTop: "1px solid #E2E8F0", fontSize: 12, color: "#94A3B8", display: "flex", justifyContent: "space-between" }}>
+            <span>AGIS Puglia e Basilicata · Gestionale Contributi · Dati MIC / DG Spettacolo e Regione Puglia</span>
+            <span>Report generato automaticamente</span>
+          </div>
+        </div>
+
+        {/* Footer azioni */}
+        <div className="no-print" style={{ padding: "16px 32px", borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "center", gap: 12, flexShrink: 0, background: "#F8FAFC" }}>
+          <button onClick={stampa} style={{ padding: "12px 28px", background: "#1D4ED8", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            🖨️ Stampa / Salva PDF
+          </button>
+          <button onClick={onClose} style={{ padding: "12px 28px", background: "#F1F5F9", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            Chiudi
+          </button>
+        </div>
+      </div>
     </div>
-
-    <div class="section-title">Elenco completo &mdash; clicca un organismo per il dettaglio assegnazioni</div>
-    <table>
-      <thead>
-        <tr>
-          <th rowspan="2" style="vertical-align:bottom;">Organismo</th>
-          <th rowspan="2" style="vertical-align:bottom;">Sede</th>${theadGroupMic}${theadGroupReg}
-          <th rowspan="2" style="text-align:right;vertical-align:bottom;">Totale</th>
-        </tr>
-        <tr>${theadMic}${theadReg}
-        </tr>
-      </thead>
-      <tbody>
-        ${righeHTML}
-      </tbody>
-      <tfoot>
-        <tr style="background:#F1F5F9;font-weight:800;">
-          <td colspan="2" style="padding:12px;font-size:13px;">TOTALE</td>${tfootMic}${tfootReg}
-          <td style="padding:12px;text-align:right;font-family:monospace;font-size:14px;color:#065F46;">${fmt2((mostraMic?micTot2025+micTot2026:0)+(mostraReg?regTot2025+regTot2026:0))}</td>
-        </tr>
-      </tfoot>
-    </table>
-
-    <div class="footer">
-      <span>AGIS Puglia e Basilicata &middot; Gestionale Contributi &middot; Dati MIC / DG Spettacolo e Regione Puglia</span>
-      <span>Report generato automaticamente</span>
-    </div>
-  </div>
-
-  <div class="no-print" style="text-align:center;margin-top:24px;">
-    <button onclick="window.print()" style="padding:11px 26px;background:#1D4ED8;color:white;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;">Stampa / Salva PDF</button>
-  </div>
-
-  <script>
-    var ORGANISMI_DATA = ${datiOrganismiJSON};
-    document.querySelectorAll('.riga-org').forEach(function(tr) {
-      tr.addEventListener('click', function() {
-        var idx = parseInt(tr.getAttribute('data-idx'));
-        var org = ORGANISMI_DATA[idx];
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ tipo: 'apri_organismo', denominazione: org.denominazione, id: org.id_organismo }, '*');
-          window.opener.focus();
-        }
-      });
-    });
-  </script>
-</body>
-</html>`;
+  );
 }
 
 function esportaExcel(organismi) {
@@ -1030,28 +1047,14 @@ function PugliaBasilicata() {
   const { organismi, loading } = useOrganismi({ regioni: ["Puglia", "Basilicata"] });
   const [selected, setSelected] = useState(null);
   const [menuReportAperto, setMenuReportAperto] = useState(false);
+  const [reportModalita, setReportModalita] = useState(null); // null | "entrambi" | "solo_mic" | "solo_reg"
 
   const totPU = organismi.filter(o => o.regione === "Puglia").reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "MIC_FNSV").reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
   const totBA = organismi.filter(o => o.regione === "Basilicata").reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "MIC_FNSV").reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
   const totRegPU = organismi.filter(o => o.fonti.includes("REG_PU")).reduce((s, o) => s + o.assegnazioni.filter(a => a.tipo_decreto === "REG_PU" && a.anno === 2025).reduce((ss, a) => ss + (a.contributo_assegnato || 0), 0), 0);
 
-  // Ascolta i messaggi dalla finestra di report per apertura scheda organismo
-  useEffect(() => {
-    function handleMessage(event) {
-      if (event.data?.tipo === "apri_organismo") {
-        const org = organismi.find(o => o.denominazione === event.data.denominazione);
-        if (org) setSelected(org);
-      }
-    }
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [organismi]);
-
   function apriReport(modalita) {
-    const html = generaReportHTML(organismi, modalita);
-    const win = window.open('', '_blank');
-    win.document.write(html);
-    win.document.close();
+    setReportModalita(modalita);
     setMenuReportAperto(false);
   }
 
@@ -1060,6 +1063,14 @@ function PugliaBasilicata() {
   return (
     <div>
       {selected && <SchedaOrganismo org={selected} onClose={() => setSelected(null)} />}
+      {reportModalita && (
+        <ReportModal
+          organismi={organismi}
+          modalita={reportModalita}
+          onClose={() => setReportModalita(null)}
+          onSelectOrg={(org) => { setReportModalita(null); setSelected(org); }}
+        />
+      )}
 
       <div style={{ background: "linear-gradient(135deg,#7C2D12,#C2410C,#EA580C)", padding: "24px 36px", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", right: -40, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
@@ -1075,7 +1086,7 @@ function PugliaBasilicata() {
                 📄 Genera Report ▾
               </button>
               {menuReportAperto && (
-                <div style={{ position: "absolute", top: "110%", right: 0, background: "#FFFFFF", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.25)", minWidth: 220, zIndex: 50, overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: "110%", right: 0, background: "#FFFFFF", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.25)", minWidth: 220, zIndex: 9999, overflow: "hidden" }}>
                   <button onClick={() => apriReport("entrambi")} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", border: "none", background: "white", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#0F172A", borderBottom: "1px solid #F1F5F9" }}
                     onMouseOver={e => e.currentTarget.style.background = "#F8FAFC"} onMouseOut={e => e.currentTarget.style.background = "white"}>
                     🔵🟠 MIC + Regione Puglia
