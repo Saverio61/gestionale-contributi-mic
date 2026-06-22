@@ -795,7 +795,7 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
   const mostraMic = modalita === "entrambi" || modalita === "solo_mic";
   const mostraReg = modalita === "entrambi" || modalita === "solo_reg";
 
-  const DECRETI_MADRE_FNSV = ['1125','855','1291','1074','787','1137','770','1173','783'];
+  const DECRETI_MADRE_FNSV = ['1125','855','1291','879','1074','787','1137','770','1173','783'];
 
   const righe = organismi.map(o => {
     const mic = { 2025: 0, 2026: 0, 2027: 0 };
@@ -991,7 +991,7 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
 }
 
 function esportaExcel(organismi) {
-  const DECRETI_MADRE_FNSV = ['1125','855','1291','1074','787','1137','770','1173','783'];
+  const DECRETI_MADRE_FNSV = ['1125','855','1291','879','1074','787','1137','770','1173','783'];
 
   const righe = organismi.map(o => {
     const mic = { 2025: 0, 2026: 0, 2027: 0 };
