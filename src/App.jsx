@@ -1072,7 +1072,7 @@ function PugliaBasilicata() {
         />
       )}
 
-      <div style={{ background: "linear-gradient(135deg,#7C2D12,#C2410C,#EA580C)", padding: "24px 36px", position: "relative", overflow: "hidden" }}>
+      <div style={{ background: "linear-gradient(135deg,#7C2D12,#C2410C,#EA580C)", padding: "24px 36px", position: "relative" }}>
         <div style={{ position: "absolute", right: -40, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
         <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
           <div>
