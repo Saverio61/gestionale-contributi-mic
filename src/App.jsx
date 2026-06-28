@@ -797,8 +797,7 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
 
   const DECRETI_MADRE_FNSV = ['1125','855','1291','879','1074','787','1137','770','1173','783'];
 
-  // Costruisce una riga per organismo dentro ogni Ambito (non per Articolo, che può cambiare tra 2025/2026)
-  // Mostra l'articolo specifico per ciascun anno separatamente, evitando falsi -100%/+inf% per cambio categoria
+  // Una riga per organismo dentro ogni Ambito (mai per Articolo, che può cambiare tra 2025/2026)
   const gruppiMap = {};
 
   organismi.forEach(o => {
@@ -810,265 +809,209 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
       if (!isReg && !DECRETI_MADRE_FNSV.includes(String(a.numero_rep))) return;
 
       const ambito = isReg ? "Regione Puglia" : (a.ambito || "—");
-      const articolo = isReg ? "POC 2021-2027" : (a.articolo_dm || "—");
-      if (!perAmbito[ambito]) perAmbito[ambito] = { anni: {}, articoli: {} };
+      if (!perAmbito[ambito]) perAmbito[ambito] = { anni: {} };
       perAmbito[ambito].anni[a.anno] = (perAmbito[ambito].anni[a.anno] || 0) + (a.contributo_assegnato || 0);
-      if (!perAmbito[ambito].articoli[a.anno]) perAmbito[ambito].articoli[a.anno] = new Set();
-      perAmbito[ambito].articoli[a.anno].add(articolo);
     });
 
     Object.entries(perAmbito).forEach(([ambito, grp]) => {
-      if (!gruppiMap[ambito]) gruppiMap[ambito] = { ambito, righe: [] };
+      const regioneKey = o.regione === "Basilicata" ? "Basilicata" : "Puglia";
+      const mapKey = `${regioneKey}|||${ambito}`;
+      if (!gruppiMap[mapKey]) gruppiMap[mapKey] = { regione: regioneKey, ambito, righe: [] };
       const v2025 = grp.anni[2025] || 0;
       const v2026 = grp.anni[2026] || 0;
       if (v2025 === 0 && v2026 === 0) return;
       const variazione = v2025 > 0 ? ((v2026 - v2025) / v2025) * 100 : null;
-      const art2025 = grp.articoli[2025] ? [...grp.articoli[2025]].join(", ") : "—";
-      const art2026 = grp.articoli[2026] ? [...grp.articoli[2026]].join(", ") : "—";
-      gruppiMap[ambito].righe.push({
+      gruppiMap[mapKey].righe.push({
         denominazione: o.denominazione,
-        comune: o.comune, sigla_provincia: o.sigla_provincia, regione: o.regione,
-        v2025, v2026, variazione, art2025, art2026,
+        comune: o.comune, sigla_provincia: o.sigla_provincia,
+        v2025, v2026, variazione,
         orgRef: o,
       });
     });
   });
 
-  // Ordina i gruppi: Ambito alfabetico (Regione Puglia in fondo)
   const gruppiOrdinati = Object.values(gruppiMap)
-    .map(g => ({ ...g, totale: g.righe.reduce((s, r) => s + r.v2025 + r.v2026, 0) }))
     .filter(g => g.righe.length > 0)
     .sort((a, b) => {
       if (a.ambito === "Regione Puglia" && b.ambito !== "Regione Puglia") return 1;
       if (b.ambito === "Regione Puglia" && a.ambito !== "Regione Puglia") return -1;
       return a.ambito.localeCompare(b.ambito);
     });
-
-  // Ordina righe dentro ogni gruppo per contributo totale decrescente
   gruppiOrdinati.forEach(g => g.righe.sort((a, b) => (b.v2025 + b.v2026) - (a.v2025 + a.v2026)));
 
-  // Divide ogni gruppo in due sotto-blocchi: Puglia e Basilicata
-  const gruppiPerRegione = (regioneFiltro) => gruppiOrdinati
-    .map(g => ({ ...g, righe: g.righe.filter(r => r.regione === regioneFiltro) }))
-    .filter(g => g.righe.length > 0);
+  const gruppiPuglia = gruppiOrdinati.filter(g => g.regione === "Puglia");
+  const gruppiBasilicata = gruppiOrdinati.filter(g => g.regione === "Basilicata");
 
-  const gruppiPuglia = gruppiPerRegione("Puglia");
-  const gruppiBasilicata = gruppiPerRegione("Basilicata");
+  const sommaRegione = (gruppi, anno) => gruppi.filter(g => g.ambito !== "Regione Puglia" || mostraReg).reduce((s, g) => s + g.righe.reduce((ss, r) => ss + (anno === 2025 ? r.v2025 : r.v2026), 0), 0);
+  const orgUnici = (regioneNome) => new Set(organismi.filter(o => (o.regione === "Basilicata" ? "Basilicata" : "Puglia") === regioneNome).map(o => o.denominazione)).size;
 
-  const micTot2025 = gruppiOrdinati.filter(g => g.ambito !== "Regione Puglia").reduce((s, g) => s + g.righe.reduce((ss, r) => ss + r.v2025, 0), 0);
-  const micTot2026 = gruppiOrdinati.filter(g => g.ambito !== "Regione Puglia").reduce((s, g) => s + g.righe.reduce((ss, r) => ss + r.v2026, 0), 0);
-  const regTot2025 = gruppiOrdinati.filter(g => g.ambito === "Regione Puglia").reduce((s, g) => s + g.righe.reduce((ss, r) => ss + r.v2025, 0), 0);
-  const regTot2026 = gruppiOrdinati.filter(g => g.ambito === "Regione Puglia").reduce((s, g) => s + g.righe.reduce((ss, r) => ss + r.v2026, 0), 0);
-  const varMicTotale = micTot2025 > 0 ? ((micTot2026 - micTot2025) / micTot2025) * 100 : 0;
-  const varRegTotale = regTot2025 > 0 ? ((regTot2026 - regTot2025) / regTot2025) * 100 : 0;
+  const pugliaTot2025 = sommaRegione(gruppiPuglia, 2025);
+  const pugliaTot2026 = sommaRegione(gruppiPuglia, 2026);
+  const basTot2025 = sommaRegione(gruppiBasilicata, 2025);
+  const basTot2026 = sommaRegione(gruppiBasilicata, 2026);
+  const varPct = (v25, v26) => v25 > 0 ? ((v26 - v25) / v25) * 100 : null;
+
   const numOrganismiTotali = organismi.length;
 
-  const VarTag = ({ v }) => {
-    if (v === null) return <span style={{ color: "#94A3B8" }}>—</span>;
-    const color = v >= 0 ? "#059669" : "#DC2626";
-    const icona = v >= 0 ? "▲" : "▼";
-    return <span style={{ color, fontWeight: 700 }}>{icona} {v>=0?'+':''}{v.toFixed(1)}%</span>;
+  const VarSpan = ({ v }) => {
+    if (v === null) return <span>—</span>;
+    return <span className={v >= 0 ? "pos" : "neg"}>{v>=0?'+':''}{v.toFixed(1)}%</span>;
   };
 
   const titoloModalita = modalita === "solo_mic" ? "Decreti Madre FNSV" : modalita === "solo_reg" ? "Regione Puglia" : "Decreti Madre FNSV e Regione Puglia";
-  const noteModalita = modalita === "entrambi" ? "Esclusi bandi speciali (Periferie, Progetti Speciali, Tournée Estero)" : modalita === "solo_mic" ? "Solo MIC/FNSV — esclusa Regione Puglia e bandi speciali" : "Solo Regione Puglia — POC 2021-2027";
 
-  function stampa() {
-    window.print();
+  function stampa() { window.print(); }
+
+  function renderGruppi(gruppi) {
+    return gruppi.map((g, gi) => {
+      const gTot2025 = g.righe.reduce((s, r) => s + r.v2025, 0);
+      const gTot2026 = g.righe.reduce((s, r) => s + r.v2026, 0);
+      const gVar = varPct(gTot2025, gTot2026);
+      return (
+        <div key={gi} style={{ pageBreakInside: "avoid" }}>
+          <div className="articolo-titolo">
+            {g.ambito.toUpperCase()}
+            <span className="totali">2025: {fmt2(gTot2025)} &nbsp;|&nbsp; 2026: {fmt2(gTot2026)} &nbsp;|&nbsp; <VarSpan v={gVar} /></span>
+          </div>
+          <table className="dati">
+            <thead>
+              <tr>
+                <th>Organismo</th>
+                <th>Comune</th>
+                <th>Prov.</th>
+                <th className="num">2025</th>
+                <th className="num">2026</th>
+                <th className="num">Var.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {g.righe.map((r, ri) => (
+                <tr key={ri} onClick={() => onSelectOrg(r.orgRef)} style={{ cursor: "pointer" }}>
+                  <td>{r.denominazione}</td>
+                  <td>{r.comune || "—"}</td>
+                  <td>{r.sigla_provincia || "—"}</td>
+                  <td className="num">{r.v2025 > 0 ? fmt2(r.v2025) : "—"}</td>
+                  <td className="num">{r.v2026 > 0 ? fmt2(r.v2026) : "—"}</td>
+                  <td className="num"><VarSpan v={r.variazione} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    });
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(10,22,40,0.85)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="report-print-area" style={{ background: "#FFFFFF", borderRadius: 12, width: "min(1400px, 98vw)", maxHeight: "94vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 40px 100px rgba(0,0,0,0.5)" }}>
+      <div className="report-print-area" style={{ background: "#FFFFFF", width: "min(1100px, 98vw)", maxHeight: "94vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
 
         <style>{`
+          .report-print-area * { box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; }
+          .doc-body { padding: 40px 50px; }
+          .testata { text-align: center; border-bottom: 2px solid #1a1a1a; padding-bottom: 14px; margin-bottom: 24px; }
+          .testata .ente { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+          .testata .titolo { font-size: 17px; font-weight: bold; margin: 8px 0 4px; }
+          .testata .sub { font-size: 11px; color: #444; }
+          .riepilogo table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 26px; }
+          .riepilogo th, .riepilogo td { border: 1px solid #999; padding: 6px 10px; text-align: right; }
+          .riepilogo th { background: #e8e8e8; text-align: center; font-weight: bold; }
+          .riepilogo td:first-child, .riepilogo th:first-child { text-align: left; }
+          .riepilogo .tot-row td { font-weight: bold; background: #e8e8e8; border-top: 2px solid #999; }
+          .regione-titolo { font-size: 15px; font-weight: bold; text-transform: uppercase; background: #1a1a1a; color: white; padding: 7px 12px; margin: 26px 0 0; }
+          .articolo-titolo { font-size: 12px; font-weight: bold; background: #d9d9d9; padding: 5px 12px; border: 1px solid #999; border-top: none; }
+          .articolo-titolo .totali { float: right; font-weight: normal; }
+          table.dati { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 0; }
+          table.dati th { background: #f0f0f0; border: 1px solid #999; padding: 5px 9px; text-align: left; font-weight: bold; }
+          table.dati th.num { text-align: right; }
+          table.dati td { border: 1px solid #ccc; padding: 5px 9px; }
+          table.dati td.num { text-align: right; font-family: 'Courier New', monospace; }
+          table.dati tr:nth-child(even) { background: #fafafa; }
+          table.dati tr:hover { background: #fff3cd; }
+          .pos { color: #006400; }
+          .neg { color: #b30000; }
+          .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #999; font-size: 10px; color: #555; text-align: center; }
           @media print {
+            .no-print { display: none !important; }
             body * { visibility: hidden; }
             .report-print-area, .report-print-area * { visibility: visible; }
             .report-print-area { position: absolute; left: 0; top: 0; width: 100% !important; max-height: none !important; box-shadow: none !important; }
-            .no-print { display: none !important; }
-            .gruppo-articolo { page-break-inside: avoid; }
           }
         `}</style>
 
-        {/* Header */}
-        <div style={{ background: "linear-gradient(135deg,#0A1628,#1E3A5F)", color: "white", padding: "24px 32px", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontSize: 11, color: "#F0C040", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>AGIS Puglia e Basilicata · Gestionale Contributi Spettacolo dal Vivo</div>
-            <h1 style={{ fontSize: 24, margin: 0, fontWeight: 900 }}>Report Puglia &amp; Basilicata — {titoloModalita} · 2025/2026</h1>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", margin: "8px 0 0" }}>Generato il {oggi} · {numOrganismiTotali} organismi · {noteModalita}</p>
-          </div>
-          <button className="no-print" onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", width: 36, height: 36, borderRadius: 8, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>✕</button>
+        <div className="no-print" style={{ padding: "14px 24px", borderBottom: "1px solid #ddd", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f5f5f5" }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>Anteprima Report</span>
+          <button onClick={onClose} style={{ background: "none", border: "1px solid #999", width: 30, height: 30, borderRadius: 4, cursor: "pointer", fontSize: 16 }}>✕</button>
         </div>
 
-        {/* Corpo scrollabile */}
-        <div style={{ overflow: "auto", flex: 1, padding: "26px 32px" }}>
+        <div style={{ overflow: "auto", flex: 1 }}>
+          <div className="doc-body">
 
-          {/* KPI */}
-          <div style={{ display: "flex", gap: 14, marginBottom: 26 }}>
-            {mostraMic && (
+            <div className="testata">
+              <div className="ente">AGIS Puglia e Basilicata</div>
+              <div className="titolo">Report Contributi FNSV — Confronto 2025 / 2026</div>
+              <div className="sub">{titoloModalita} — Generato il {oggi} — {numOrganismiTotali} organismi</div>
+            </div>
+
+            <div className="riepilogo">
+              <table>
+                <tr>
+                  <th>Ambito territoriale</th>
+                  <th>Organismi</th>
+                  <th>Totale 2025</th>
+                  <th>Totale 2026</th>
+                  <th>Variazione</th>
+                </tr>
+                <tr>
+                  <td>Puglia</td>
+                  <td style={{ textAlign: "center" }}>{orgUnici("Puglia")}</td>
+                  <td>{fmt2(pugliaTot2025)}</td>
+                  <td>{fmt2(pugliaTot2026)}</td>
+                  <td><VarSpan v={varPct(pugliaTot2025, pugliaTot2026)} /></td>
+                </tr>
+                <tr>
+                  <td>Basilicata</td>
+                  <td style={{ textAlign: "center" }}>{orgUnici("Basilicata")}</td>
+                  <td>{fmt2(basTot2025)}</td>
+                  <td>{fmt2(basTot2026)}</td>
+                  <td><VarSpan v={varPct(basTot2025, basTot2026)} /></td>
+                </tr>
+                <tr className="tot-row">
+                  <td>TOTALE</td>
+                  <td style={{ textAlign: "center" }}>{numOrganismiTotali}</td>
+                  <td>{fmt2(pugliaTot2025 + basTot2025)}</td>
+                  <td>{fmt2(pugliaTot2026 + basTot2026)}</td>
+                  <td><VarSpan v={varPct(pugliaTot2025 + basTot2025, pugliaTot2026 + basTot2026)} /></td>
+                </tr>
+              </table>
+            </div>
+
+            {gruppiPuglia.length > 0 && (
               <>
-                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: "3px solid #1D4ED8", borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>MIC 2025</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: "#1D4ED8" }}>{fmt2(micTot2025)}</div>
-                </div>
-                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: "3px solid #1D4ED8", borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>MIC 2026</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: "#1D4ED8" }}>{fmt2(micTot2026)}</div>
-                </div>
-                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: `3px solid ${varMicTotale>=0?'#059669':'#DC2626'}`, borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Var. MIC</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: varMicTotale>=0?'#059669':'#DC2626' }}>{varMicTotale>=0?'+':''}{varMicTotale.toFixed(1)}%</div>
-                </div>
+                <div className="regione-titolo">PUGLIA</div>
+                {renderGruppi(gruppiPuglia)}
               </>
             )}
-            {mostraReg && (
+
+            {gruppiBasilicata.length > 0 && (
               <>
-                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: "3px solid #C2410C", borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Reg. Puglia 2025</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: "#C2410C" }}>{fmt2(regTot2025)}</div>
-                </div>
-                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: "3px solid #C2410C", borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Reg. Puglia 2026</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: "#C2410C" }}>{fmt2(regTot2026)}</div>
-                </div>
-                <div style={{ flex: 1, background: "#F8FAFC", border: "1px solid #E2E8F0", borderTop: `3px solid ${varRegTotale>=0?'#059669':'#DC2626'}`, borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Var. Reg. Puglia</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "monospace", color: varRegTotale>=0?'#059669':'#DC2626' }}>{varRegTotale>=0?'+':''}{varRegTotale.toFixed(1)}%</div>
-                </div>
+                <div className="regione-titolo">BASILICATA</div>
+                {renderGruppi(gruppiBasilicata)}
               </>
             )}
-          </div>
 
-          {/* Sezione Puglia */}
-          {gruppiPuglia.length > 0 && (
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 16, fontWeight: 900, color: "#92400E", marginBottom: 14, paddingBottom: 8, borderBottom: "3px solid #FCD34D" }}>
-                🎭 PUGLIA
-              </div>
-              {gruppiPuglia.map((g, gi) => {
-                const gTot2025 = g.righe.reduce((s, r) => s + r.v2025, 0);
-                const gTot2026 = g.righe.reduce((s, r) => s + r.v2026, 0);
-                const gVar = gTot2025 > 0 ? ((gTot2026 - gTot2025) / gTot2025) * 100 : null;
-                const isReg = g.ambito === "Regione Puglia";
-                const colorBase = isReg ? "#9A3412" : "#1E3A8A";
-                const colorBaseLight = isReg ? "#FFF7ED" : "#EFF6FF";
-                return (
-                  <div key={gi} className="gruppo-articolo" style={{ marginBottom: 18 }}>
-                    <div style={{ background: colorBase, color: "white", padding: "10px 16px", borderRadius: "8px 8px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 14, fontWeight: 800 }}>{g.ambito}</span>
-                      <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, display: "flex", gap: 14 }}>
-                        <span>2025: {fmt2(gTot2025)}</span>
-                        <span>2026: {fmt2(gTot2026)}</span>
-                        <VarTag v={gVar} />
-                      </div>
-                    </div>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase" }}>Organismo</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase" }}>Sede</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase" }}>Articolo 2025</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "right", fontSize: 11, textTransform: "uppercase" }}>2025</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase" }}>Articolo 2026</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "right", fontSize: 11, textTransform: "uppercase" }}>2026</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "right", fontSize: 11, textTransform: "uppercase" }}>Var.</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {g.righe.map((r, ri) => (
-                          <tr key={ri} onClick={() => onSelectOrg(r.orgRef)}
-                            style={{ cursor: "pointer", background: ri % 2 === 0 ? "#FFFFFF" : colorBaseLight }}
-                            onMouseOver={e => e.currentTarget.style.background = "#FEF3C7"}
-                            onMouseOut={e => e.currentTarget.style.background = ri % 2 === 0 ? "#FFFFFF" : colorBaseLight}>
-                            <td style={{ padding: "8px 12px", fontWeight: 700, color: "#0F172A", borderBottom: "1px solid #E2E8F0" }}>{r.denominazione} <span style={{ color: "#94A3B8", fontSize: 11 }}>›</span></td>
-                            <td style={{ padding: "8px 12px", color: "#64748B", fontSize: 12, borderBottom: "1px solid #E2E8F0" }}>{r.comune ? `${r.comune} (${r.sigla_provincia})` : "—"}</td>
-                            <td style={{ padding: "8px 12px", color: "#64748B", fontSize: 11, borderBottom: "1px solid #E2E8F0" }}>{r.art2025}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace", color: "#374151", fontSize: 13, borderBottom: "1px solid #E2E8F0" }}>{r.v2025 > 0 ? fmt2(r.v2025) : "—"}</td>
-                            <td style={{ padding: "8px 12px", color: "#64748B", fontSize: 11, borderBottom: "1px solid #E2E8F0" }}>{r.art2026}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace", color: "#374151", fontSize: 13, borderBottom: "1px solid #E2E8F0" }}>{r.v2026 > 0 ? fmt2(r.v2026) : "—"}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 12, borderBottom: "1px solid #E2E8F0" }}><VarTag v={r.variazione} /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })}
+            <div className="footer">
+              AGIS Puglia e Basilicata — Gestionale Contributi Spettacolo dal Vivo — Dati MIC/DG Spettacolo e Regione Puglia
             </div>
-          )}
-
-          {/* Sezione Basilicata */}
-          {gruppiBasilicata.length > 0 && (
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 16, fontWeight: 900, color: "#064E3B", marginBottom: 14, paddingBottom: 8, borderBottom: "3px solid #6EE7B7" }}>
-                🎭 BASILICATA
-              </div>
-              {gruppiBasilicata.map((g, gi) => {
-                const gTot2025 = g.righe.reduce((s, r) => s + r.v2025, 0);
-                const gTot2026 = g.righe.reduce((s, r) => s + r.v2026, 0);
-                const gVar = gTot2025 > 0 ? ((gTot2026 - gTot2025) / gTot2025) * 100 : null;
-                const isReg = g.ambito === "Regione Puglia";
-                const colorBase = isReg ? "#9A3412" : "#1E3A8A";
-                const colorBaseLight = isReg ? "#FFF7ED" : "#EFF6FF";
-                return (
-                  <div key={gi} className="gruppo-articolo" style={{ marginBottom: 18 }}>
-                    <div style={{ background: colorBase, color: "white", padding: "10px 16px", borderRadius: "8px 8px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 14, fontWeight: 800 }}>{g.ambito}</span>
-                      <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, display: "flex", gap: 14 }}>
-                        <span>2025: {fmt2(gTot2025)}</span>
-                        <span>2026: {fmt2(gTot2026)}</span>
-                        <VarTag v={gVar} />
-                      </div>
-                    </div>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase" }}>Organismo</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase" }}>Sede</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase" }}>Articolo 2025</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "right", fontSize: 11, textTransform: "uppercase" }}>2025</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase" }}>Articolo 2026</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "right", fontSize: 11, textTransform: "uppercase" }}>2026</th>
-                          <th style={{ background: "#0F172A", color: "white", padding: "8px 12px", textAlign: "right", fontSize: 11, textTransform: "uppercase" }}>Var.</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {g.righe.map((r, ri) => (
-                          <tr key={ri} onClick={() => onSelectOrg(r.orgRef)}
-                            style={{ cursor: "pointer", background: ri % 2 === 0 ? "#FFFFFF" : colorBaseLight }}
-                            onMouseOver={e => e.currentTarget.style.background = "#FEF3C7"}
-                            onMouseOut={e => e.currentTarget.style.background = ri % 2 === 0 ? "#FFFFFF" : colorBaseLight}>
-                            <td style={{ padding: "8px 12px", fontWeight: 700, color: "#0F172A", borderBottom: "1px solid #E2E8F0" }}>{r.denominazione} <span style={{ color: "#94A3B8", fontSize: 11 }}>›</span></td>
-                            <td style={{ padding: "8px 12px", color: "#64748B", fontSize: 12, borderBottom: "1px solid #E2E8F0" }}>{r.comune ? `${r.comune} (${r.sigla_provincia})` : "—"}</td>
-                            <td style={{ padding: "8px 12px", color: "#64748B", fontSize: 11, borderBottom: "1px solid #E2E8F0" }}>{r.art2025}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace", color: "#374151", fontSize: 13, borderBottom: "1px solid #E2E8F0" }}>{r.v2025 > 0 ? fmt2(r.v2025) : "—"}</td>
-                            <td style={{ padding: "8px 12px", color: "#64748B", fontSize: 11, borderBottom: "1px solid #E2E8F0" }}>{r.art2026}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace", color: "#374151", fontSize: 13, borderBottom: "1px solid #E2E8F0" }}>{r.v2026 > 0 ? fmt2(r.v2026) : "—"}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 12, borderBottom: "1px solid #E2E8F0" }}><VarTag v={r.variazione} /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div style={{ marginTop: 24, paddingTop: 14, borderTop: "1px solid #E2E8F0", fontSize: 12, color: "#94A3B8", display: "flex", justifyContent: "space-between" }}>
-            <span>AGIS Puglia e Basilicata · Gestionale Contributi · Dati MIC / DG Spettacolo e Regione Puglia</span>
-            <span>Report generato automaticamente</span>
           </div>
         </div>
 
-        {/* Footer azioni */}
-        <div className="no-print" style={{ padding: "16px 32px", borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "center", gap: 12, flexShrink: 0, background: "#F8FAFC" }}>
-          <button onClick={stampa} style={{ padding: "12px 28px", background: "#1D4ED8", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-            🖨️ Stampa / Salva PDF
+        <div className="no-print" style={{ padding: "14px 24px", borderTop: "1px solid #ddd", display: "flex", justifyContent: "center", gap: 10, background: "#f5f5f5" }}>
+          <button onClick={stampa} style={{ padding: "10px 24px", background: "#1a1a1a", color: "white", border: "none", borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            Stampa / Salva PDF
           </button>
-          <button onClick={onClose} style={{ padding: "12px 28px", background: "#F1F5F9", color: "#374151", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+          <button onClick={onClose} style={{ padding: "10px 24px", background: "white", color: "#1a1a1a", border: "1px solid #999", borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
             Chiudi
           </button>
         </div>
