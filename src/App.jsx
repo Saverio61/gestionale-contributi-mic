@@ -788,6 +788,75 @@ function Dashboard() {
 }
 
 // ── PUGLIA & BASILICATA ───────────────────────────────────────
+const MAPPA_ARTICOLI = {
+  "Art. 17": ["Art. 17", "Teatri di tradizione"],
+  "Art. 18": ["Art. 18", "Istituzioni concertistico-orchestrali"],
+  "Art. 19": ["Art. 19", "Nuove Orchestre Territoriali"],
+  "Art. 20": ["Art. 20", "Attività liriche ordinarie"],
+  "Art. 21 comma 1": ["Art. 21 c.1", "Complessi strumentali"],
+  "Art. 21 comma 2": ["Art. 21 c.2", "Complessi strumentali giovanili"],
+  "Art. 22": ["Art. 22", "Centri di produzione musica"],
+  "Art. 23": ["Art. 23", "Circuiti regionali musicali"],
+  "Art. 24": ["Art. 24", "Programmazione attività concertistiche e corali"],
+  "Art. 25 comma 4": ["Art. 25 c.4", "Festival di assoluto prestigio"],
+  "Art. 25": ["Art. 25", "Festival di musica"],
+  "Art. 9": ["Art. 9", "Teatri nazionali"],
+  "Art. 10 comma 3": ["Art. 10 c.3", "Teatri Città - minoranze linguistiche"],
+  "Art. 10": ["Art. 10", "Teatri delle Città di rilevante interesse culturale"],
+  "Art. 12 comma 2": ["Art. 12 c.2", "Centri produzione teatrale cap. 450"],
+  "Art. 12 comma 4": ["Art. 12 c.4", "Centri produzione teatrale cap. 250"],
+  "Art. 12 comma 6": ["Art. 12 c.6", "Centri produzione teatrale cap. 200"],
+  "Art. 12 comma 9": ["Art. 12 c.9", "Centri produzione Teatro infanzia/gioventù"],
+  "Art. 13 comma 1": ["Art. 13 c.1", "Imprese di produzione teatrale"],
+  "Art. 13 comma 2": ["Art. 13 c.2", "Imprese produzione teatro di innovazione"],
+  "Art. 13 comma 3": ["Art. 13 c.3", "Imprese produzione teatro infanzia/gioventù"],
+  "Art. 13 comma 4": ["Art. 13 c.4", "Imprese produzione teatro di figura"],
+  "Art. 13 comma 7": ["Art. 13 c.7", "Imprese produzione teatro di strada"],
+  "Art. 14": ["Art. 14", "Circuiti regionali teatrali"],
+  "Art. 15 comma 2": ["Art. 15 c.2", "Programmazione sale polifunzionali"],
+  "Art. 15": ["Art. 15", "Organismi di programmazione teatrale"],
+  "Art. 16 comma 3": ["Art. 16 c.3", "Festival e rassegne teatro di strada"],
+  "Art. 16 comma 4": ["Art. 16 c.4", "Festival e rassegne teatro di poesia"],
+  "Art. 16": ["Art. 16", "Festival di teatro"],
+  "Art. 26": ["Art. 26", "Centri Coreografici Nazionali"],
+  "Art. 27": ["Art. 27", "Centri Danza di Rilevante Interesse"],
+  "Art. 28": ["Art. 28", "Centri di Produzione Danza"],
+  "Art. 29 c.1": ["Art. 29 c.1", "Organismi di Produzione danza"],
+  "Art. 29 c.2": ["Art. 29 c.2", "Organismi Produzione danza Under 35"],
+  "Art. 30": ["Art. 30", "Circuiti regionali danza"],
+  "Art. 32": ["Art. 32", "Festival e rassegne di danza"],
+  "Art. 49": ["Art. 49", "Biennale di Venezia - Danza"],
+  "Art. 50": ["Art. 50", "Accademia Nazionale di Danza"],
+  "Art. 33": ["Art. 33", "Centri di Produzione Circo"],
+  "Art. 35 comma 1": ["Art. 35 c.1", "Imprese di produzione circo"],
+  "Art. 35 c.1": ["Art. 35 c.1", "Imprese di produzione circo"],
+  "Art. 35 comma 2": ["Art. 35 c.2", "Imprese produzione Circo Under 35"],
+  "Art. 35 comma 3": ["Art. 35 c.3", "Imprese produzione circo contemporaneo"],
+  "Art. 35 c.3": ["Art. 35 c.3", "Imprese produzione circo contemporaneo"],
+  "Art. 36 comma 2": ["Art. 36 c.2", "Festival circo carattere competitivo"],
+  "Art. 36 comma 3": ["Art. 36 c.3", "Festival circo carattere non competitivo"],
+  "Art. 36 comma 3 Fest": ["Art. 36 c.3", "Festival circo carattere non competitivo"],
+  "Art. 42": ["Art. 42", "Circuiti regionali multidisciplinari"],
+  "Art. 43 c.1 a)": ["Art. 43 a)", "Programmazione multidisciplinare fascia a"],
+  "Art. 43 c.1 b)": ["Art. 43 b)", "Programmazione multidisciplinare fascia b"],
+  "Art. 43 c.1 c)": ["Art. 43 c)", "Programmazione multidisciplinare fascia c"],
+  "Art. 44": ["Art. 44", "Festival multidisciplinari"],
+  "Art. 45": ["Art. 45", "Azioni trasversali di promozione"],
+  "Art. 46": ["Art. 46", "Tournée all'estero"],
+  "Art. 48 DM 463/2024": ["Art. 48", "Disposizione transitoria"],
+};
+
+function normalizzaArticolo(grezzo) {
+  if (!grezzo) return ["—", "—"];
+  const a = grezzo.trim();
+  if (MAPPA_ARTICOLI[a]) return MAPPA_ARTICOLI[a];
+  const aClean = a.replace(/\s*(del D\.M\.|Fest|Azioni trasv\.?|Festival.*$|Complessi.*$|Centri.*$)\s*$/i, "").trim();
+  if (MAPPA_ARTICOLI[aClean]) return MAPPA_ARTICOLI[aClean];
+  const m = a.match(/^(Art\.\s*\d+(?:\s*comma\s*\d+)?)/);
+  if (m && MAPPA_ARTICOLI[m[1]]) return MAPPA_ARTICOLI[m[1]];
+  return [a, a];
+}
+
 function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
   const fmt2 = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
   const oggi = new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
@@ -797,11 +866,11 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
 
   const DECRETI_MADRE_FNSV = ['1125','855','1291','879','1074','787','1137','770','1173','783'];
 
-  // Una riga per organismo dentro ogni Ambito (mai per Articolo, che può cambiare tra 2025/2026)
+  // Raggruppa per Regione -> Ambito -> Articolo normalizzato, una riga per organismo
   const gruppiMap = {};
 
   organismi.forEach(o => {
-    const perAmbito = {};
+    const perArticolo = {};
     o.assegnazioni.forEach(a => {
       const isReg = a.tipo_decreto === "REG_PU";
       if (isReg && !mostraReg) return;
@@ -809,14 +878,21 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
       if (!isReg && !DECRETI_MADRE_FNSV.includes(String(a.numero_rep))) return;
 
       const ambito = isReg ? "Regione Puglia" : (a.ambito || "—");
-      if (!perAmbito[ambito]) perAmbito[ambito] = { anni: {} };
-      perAmbito[ambito].anni[a.anno] = (perAmbito[ambito].anni[a.anno] || 0) + (a.contributo_assegnato || 0);
+      let articoloNorm, nomeAttivita;
+      if (isReg) {
+        articoloNorm = "POC 2021-2027"; nomeAttivita = "Soggetti privati FNSV";
+      } else {
+        [articoloNorm, nomeAttivita] = normalizzaArticolo(a.articolo_dm);
+      }
+      const key = `${ambito}|||${articoloNorm}`;
+      if (!perArticolo[key]) perArticolo[key] = { ambito, articoloNorm, nomeAttivita, anni: {} };
+      perArticolo[key].anni[a.anno] = (perArticolo[key].anni[a.anno] || 0) + (a.contributo_assegnato || 0);
     });
 
-    Object.entries(perAmbito).forEach(([ambito, grp]) => {
+    Object.values(perArticolo).forEach(grp => {
       const regioneKey = o.regione === "Basilicata" ? "Basilicata" : "Puglia";
-      const mapKey = `${regioneKey}|||${ambito}`;
-      if (!gruppiMap[mapKey]) gruppiMap[mapKey] = { regione: regioneKey, ambito, righe: [] };
+      const mapKey = `${regioneKey}|||${grp.ambito}|||${grp.articoloNorm}`;
+      if (!gruppiMap[mapKey]) gruppiMap[mapKey] = { regione: regioneKey, ambito: grp.ambito, articoloNorm: grp.articoloNorm, nomeAttivita: grp.nomeAttivita, righe: [] };
       const v2025 = grp.anni[2025] || 0;
       const v2026 = grp.anni[2026] || 0;
       if (v2025 === 0 && v2026 === 0) return;
@@ -835,14 +911,15 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
     .sort((a, b) => {
       if (a.ambito === "Regione Puglia" && b.ambito !== "Regione Puglia") return 1;
       if (b.ambito === "Regione Puglia" && a.ambito !== "Regione Puglia") return -1;
-      return a.ambito.localeCompare(b.ambito);
+      if (a.ambito !== b.ambito) return a.ambito.localeCompare(b.ambito);
+      return a.articoloNorm.localeCompare(b.articoloNorm);
     });
   gruppiOrdinati.forEach(g => g.righe.sort((a, b) => (b.v2025 + b.v2026) - (a.v2025 + a.v2026)));
 
   const gruppiPuglia = gruppiOrdinati.filter(g => g.regione === "Puglia");
   const gruppiBasilicata = gruppiOrdinati.filter(g => g.regione === "Basilicata");
 
-  const sommaRegione = (gruppi, anno) => gruppi.filter(g => g.ambito !== "Regione Puglia" || mostraReg).reduce((s, g) => s + g.righe.reduce((ss, r) => ss + (anno === 2025 ? r.v2025 : r.v2026), 0), 0);
+  const sommaRegione = (gruppi, anno) => gruppi.reduce((s, g) => s + g.righe.reduce((ss, r) => ss + (anno === 2025 ? r.v2025 : r.v2026), 0), 0);
   const orgUnici = (regioneNome) => new Set(organismi.filter(o => (o.regione === "Basilicata" ? "Basilicata" : "Puglia") === regioneNome).map(o => o.denominazione)).size;
 
   const pugliaTot2025 = sommaRegione(gruppiPuglia, 2025);
@@ -863,14 +940,20 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
   function stampa() { window.print(); }
 
   function renderGruppi(gruppi) {
-    return gruppi.map((g, gi) => {
+    let ambitoCorrente = null;
+    const blocchi = [];
+    gruppi.forEach((g, gi) => {
+      if (g.ambito !== ambitoCorrente) {
+        ambitoCorrente = g.ambito;
+        blocchi.push(<div key={"amb-"+gi} className="ambito-titolo">{g.ambito.toUpperCase()}</div>);
+      }
       const gTot2025 = g.righe.reduce((s, r) => s + r.v2025, 0);
       const gTot2026 = g.righe.reduce((s, r) => s + r.v2026, 0);
       const gVar = varPct(gTot2025, gTot2026);
-      return (
+      blocchi.push(
         <div key={gi} style={{ pageBreakInside: "avoid" }}>
           <div className="articolo-titolo">
-            {g.ambito.toUpperCase()}
+            {g.articoloNorm} — {g.nomeAttivita}
             <span className="totali">2025: {fmt2(gTot2025)} &nbsp;|&nbsp; 2026: {fmt2(gTot2026)} &nbsp;|&nbsp; <VarSpan v={gVar} /></span>
           </div>
           <table className="dati">
@@ -900,6 +983,7 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
         </div>
       );
     });
+    return blocchi;
   }
 
   return (
@@ -920,6 +1004,7 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
           .riepilogo td:first-child, .riepilogo th:first-child { text-align: left; }
           .riepilogo .tot-row td { font-weight: bold; background: #e8e8e8; border-top: 2px solid #999; }
           .regione-titolo { font-size: 15px; font-weight: bold; text-transform: uppercase; background: #1a1a1a; color: white; padding: 7px 12px; margin: 26px 0 0; }
+          .ambito-titolo { font-size: 13px; font-weight: bold; text-transform: uppercase; background: #555; color: white; padding: 6px 12px; margin-top: 14px; letter-spacing: 0.5px; }
           .articolo-titolo { font-size: 12px; font-weight: bold; background: #d9d9d9; padding: 5px 12px; border: 1px solid #999; border-top: none; }
           .articolo-titolo .totali { float: right; font-weight: normal; }
           table.dati { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 0; }
