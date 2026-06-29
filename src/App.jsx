@@ -866,11 +866,12 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
 
   const DECRETI_MADRE_FNSV = ['1125','855','1291','879','1074','787','1137','770','1173','783'];
 
-  // Raggruppa per Regione -> Ambito -> Articolo normalizzato, una riga per organismo
+  // Raggruppa per Regione -> Ambito; UNA riga per organismo (mai split per articolo)
+  // Se l'articolo cambia tra 2025 e 2026, lo mostriamo come "Art.X → Art.Y" sulla stessa riga
   const gruppiMap = {};
 
   organismi.forEach(o => {
-    const perArticolo = {};
+    const perAmbito = {};
     o.assegnazioni.forEach(a => {
       const isReg = a.tipo_decreto === "REG_PU";
       if (isReg && !mostraReg) return;
@@ -878,29 +879,35 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
       if (!isReg && !DECRETI_MADRE_FNSV.includes(String(a.numero_rep))) return;
 
       const ambito = isReg ? "Regione Puglia" : (a.ambito || "—");
-      let articoloNorm, nomeAttivita;
-      if (isReg) {
-        articoloNorm = "POC 2021-2027"; nomeAttivita = "Soggetti privati FNSV";
-      } else {
-        [articoloNorm, nomeAttivita] = normalizzaArticolo(a.articolo_dm);
-      }
-      const key = `${ambito}|||${articoloNorm}`;
-      if (!perArticolo[key]) perArticolo[key] = { ambito, articoloNorm, nomeAttivita, anni: {} };
-      perArticolo[key].anni[a.anno] = (perArticolo[key].anni[a.anno] || 0) + (a.contributo_assegnato || 0);
+      let articoloNorm;
+      if (isReg) { articoloNorm = "POC 2021-2027"; }
+      else { articoloNorm = normalizzaArticolo(a.articolo_dm)[0]; }
+
+      if (!perAmbito[ambito]) perAmbito[ambito] = { anni: {}, articoliPerAnno: {} };
+      perAmbito[ambito].anni[a.anno] = (perAmbito[ambito].anni[a.anno] || 0) + (a.contributo_assegnato || 0);
+      if (!perAmbito[ambito].articoliPerAnno[a.anno]) perAmbito[ambito].articoliPerAnno[a.anno] = new Set();
+      perAmbito[ambito].articoliPerAnno[a.anno].add(articoloNorm);
     });
 
-    Object.values(perArticolo).forEach(grp => {
+    Object.entries(perAmbito).forEach(([ambito, grp]) => {
       const regioneKey = o.regione === "Basilicata" ? "Basilicata" : "Puglia";
-      const mapKey = `${regioneKey}|||${grp.ambito}|||${grp.articoloNorm}`;
-      if (!gruppiMap[mapKey]) gruppiMap[mapKey] = { regione: regioneKey, ambito: grp.ambito, articoloNorm: grp.articoloNorm, nomeAttivita: grp.nomeAttivita, righe: [] };
+      const mapKey = `${regioneKey}|||${ambito}`;
+      if (!gruppiMap[mapKey]) gruppiMap[mapKey] = { regione: regioneKey, ambito, righe: [] };
       const v2025 = grp.anni[2025] || 0;
       const v2026 = grp.anni[2026] || 0;
       if (v2025 === 0 && v2026 === 0) return;
       const variazione = v2025 > 0 ? ((v2026 - v2025) / v2025) * 100 : null;
+
+      const art2025 = grp.articoliPerAnno[2025] ? [...grp.articoliPerAnno[2025]].join("+") : null;
+      const art2026 = grp.articoliPerAnno[2026] ? [...grp.articoliPerAnno[2026]].join("+") : null;
+      let articoloLabel;
+      if (art2025 && art2026 && art2025 !== art2026) articoloLabel = `${art2025} → ${art2026}`;
+      else articoloLabel = art2026 || art2025 || "—";
+
       gruppiMap[mapKey].righe.push({
         denominazione: o.denominazione,
         comune: o.comune, sigla_provincia: o.sigla_provincia,
-        v2025, v2026, variazione,
+        v2025, v2026, variazione, articoloLabel,
         orgRef: o,
       });
     });
@@ -911,8 +918,7 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
     .sort((a, b) => {
       if (a.ambito === "Regione Puglia" && b.ambito !== "Regione Puglia") return 1;
       if (b.ambito === "Regione Puglia" && a.ambito !== "Regione Puglia") return -1;
-      if (a.ambito !== b.ambito) return a.ambito.localeCompare(b.ambito);
-      return a.articoloNorm.localeCompare(b.articoloNorm);
+      return a.ambito.localeCompare(b.ambito);
     });
   gruppiOrdinati.forEach(g => g.righe.sort((a, b) => (b.v2025 + b.v2026) - (a.v2025 + a.v2026)));
 
@@ -940,20 +946,14 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
   function stampa() { window.print(); }
 
   function renderGruppi(gruppi) {
-    let ambitoCorrente = null;
-    const blocchi = [];
-    gruppi.forEach((g, gi) => {
-      if (g.ambito !== ambitoCorrente) {
-        ambitoCorrente = g.ambito;
-        blocchi.push(<div key={"amb-"+gi} className="ambito-titolo">{g.ambito.toUpperCase()}</div>);
-      }
+    return gruppi.map((g, gi) => {
       const gTot2025 = g.righe.reduce((s, r) => s + r.v2025, 0);
       const gTot2026 = g.righe.reduce((s, r) => s + r.v2026, 0);
       const gVar = varPct(gTot2025, gTot2026);
-      blocchi.push(
+      return (
         <div key={gi} style={{ pageBreakInside: "avoid" }}>
           <div className="articolo-titolo">
-            {g.articoloNorm} — {g.nomeAttivita}
+            {g.ambito.toUpperCase()}
             <span className="totali">2025: {fmt2(gTot2025)} &nbsp;|&nbsp; 2026: {fmt2(gTot2026)} &nbsp;|&nbsp; <VarSpan v={gVar} /></span>
           </div>
           <table className="dati">
@@ -962,6 +962,7 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
                 <th>Organismo</th>
                 <th>Comune</th>
                 <th>Prov.</th>
+                <th>Articolo</th>
                 <th className="num">2025</th>
                 <th className="num">2026</th>
                 <th className="num">Var.</th>
@@ -973,6 +974,7 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
                   <td>{r.denominazione}</td>
                   <td>{r.comune || "—"}</td>
                   <td>{r.sigla_provincia || "—"}</td>
+                  <td style={{ fontSize: 10.5 }}>{r.articoloLabel}</td>
                   <td className="num">{r.v2025 > 0 ? fmt2(r.v2025) : "—"}</td>
                   <td className="num">{r.v2026 > 0 ? fmt2(r.v2026) : "—"}</td>
                   <td className="num"><VarSpan v={r.variazione} /></td>
@@ -983,13 +985,12 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
         </div>
       );
     });
-    return blocchi;
   }
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="report-print-area" style={{ background: "#FFFFFF", width: "min(1100px, 98vw)", maxHeight: "94vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+      <div className="report-print-area" style={{ background: "#FFFFFF", width: "min(1150px, 98vw)", maxHeight: "94vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
 
         <style>{`
           .report-print-area * { box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; }
@@ -1004,7 +1005,6 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
           .riepilogo td:first-child, .riepilogo th:first-child { text-align: left; }
           .riepilogo .tot-row td { font-weight: bold; background: #e8e8e8; border-top: 2px solid #999; }
           .regione-titolo { font-size: 15px; font-weight: bold; text-transform: uppercase; background: #1a1a1a; color: white; padding: 7px 12px; margin: 26px 0 0; }
-          .ambito-titolo { font-size: 13px; font-weight: bold; text-transform: uppercase; background: #555; color: white; padding: 6px 12px; margin-top: 14px; letter-spacing: 0.5px; }
           .articolo-titolo { font-size: 12px; font-weight: bold; background: #d9d9d9; padding: 5px 12px; border: 1px solid #999; border-top: none; }
           .articolo-titolo .totali { float: right; font-weight: normal; }
           table.dati { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 0; }
