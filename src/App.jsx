@@ -877,37 +877,73 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
       if (isReg && !mostraReg) return;
       if (!isReg && !mostraMic) return;
       if (!isReg && !DECRETI_MADRE_FNSV.includes(String(a.numero_rep))) return;
+      if (!isReg && (a.descrizione_settore || "").toLowerCase().includes("tournee")) return;
+      if (!isReg && (a.descrizione_settore || "").toLowerCase().includes("tournée")) return;
 
       const ambito = isReg ? "Regione Puglia" : (a.ambito || "—");
       let articoloNorm;
       if (isReg) { articoloNorm = "POC 2021-2027"; }
       else { articoloNorm = normalizzaArticolo(a.articolo_dm)[0]; }
 
-      if (!perAmbito[ambito]) perAmbito[ambito] = { anni: {}, articoliPerAnno: {} };
-      perAmbito[ambito].anni[a.anno] = (perAmbito[ambito].anni[a.anno] || 0) + (a.contributo_assegnato || 0);
-      if (!perAmbito[ambito].articoliPerAnno[a.anno]) perAmbito[ambito].articoliPerAnno[a.anno] = new Set();
-      perAmbito[ambito].articoliPerAnno[a.anno].add(articoloNorm);
+      // Chiave primaria: Ambito + Articolo specifico (cosi articoli diversi nello stesso anno restano separati)
+      const artKey = `${ambito}|||${articoloNorm}`;
+      if (!perAmbito[artKey]) perAmbito[artKey] = { ambito, articolo: articoloNorm, anni: {} };
+      perAmbito[artKey].anni[a.anno] = (perAmbito[artKey].anni[a.anno] || 0) + (a.contributo_assegnato || 0);
     });
 
-    Object.entries(perAmbito).forEach(([ambito, grp]) => {
-      const regioneKey = o.regione === "Basilicata" ? "Basilicata" : "Puglia";
-      const mapKey = `${regioneKey}|||${ambito}`;
-      if (!gruppiMap[mapKey]) gruppiMap[mapKey] = { regione: regioneKey, ambito, righe: [] };
-      const v2025 = grp.anni[2025] || 0;
-      const v2026 = grp.anni[2026] || 0;
-      if (v2025 === 0 && v2026 === 0) return;
-      const variazione = v2025 > 0 ? ((v2026 - v2025) / v2025) * 100 : null;
+    // Ora uniamo gruppi articolo dello stesso Ambito che NON si sovrappongono negli anni (vero cambio articolo)
+    // Se due articoli diversi nello stesso Ambito hanno anni complementari (uno solo 2025, l'altro solo 2026), li uniamo con freccia
+    const gruppiArticolo = Object.values(perAmbito);
+    const usati = new Set();
+    const righeFinali = [];
 
-      const art2025 = grp.articoliPerAnno[2025] ? [...grp.articoliPerAnno[2025]].join("+") : null;
-      const art2026 = grp.articoliPerAnno[2026] ? [...grp.articoliPerAnno[2026]].join("+") : null;
-      let articoloLabel;
-      if (art2025 && art2026 && art2025 !== art2026) articoloLabel = `${art2025} → ${art2026}`;
-      else articoloLabel = art2026 || art2025 || "—";
+    gruppiArticolo.forEach((g1, i1) => {
+      if (usati.has(i1)) return;
+      const has2025_g1 = (g1.anni[2025] || 0) > 0;
+      const has2026_g1 = (g1.anni[2026] || 0) > 0;
+
+      // Cerca un partner complementare nello stesso ambito (g1 ha solo 2025, qualcun altro ha solo 2026, o viceversa)
+      let partner = null, partnerIdx = null;
+      if ((has2025_g1 && !has2026_g1) || (!has2025_g1 && has2026_g1)) {
+        gruppiArticolo.forEach((g2, i2) => {
+          if (i2 === i1 || usati.has(i2) || partner) return;
+          if (g2.ambito !== g1.ambito) return;
+          const has2025_g2 = (g2.anni[2025] || 0) > 0;
+          const has2026_g2 = (g2.anni[2026] || 0) > 0;
+          // Complementare: g1 ha solo 2025 e g2 ha solo 2026 (o viceversa), articoli diversi
+          if (has2025_g1 && !has2026_g1 && !has2025_g2 && has2026_g2 && g2.articolo !== g1.articolo) {
+            partner = g2; partnerIdx = i2;
+          }
+          if (!has2025_g1 && has2026_g1 && has2025_g2 && !has2026_g2 && g2.articolo !== g1.articolo) {
+            partner = g2; partnerIdx = i2;
+          }
+        });
+      }
+
+      if (partner) {
+        usati.add(i1); usati.add(partnerIdx);
+        const v2025 = (g1.anni[2025] || 0) + (partner.anni[2025] || 0);
+        const v2026 = (g1.anni[2026] || 0) + (partner.anni[2026] || 0);
+        const artA = has2025_g1 ? g1.articolo : partner.articolo;
+        const artB = has2025_g1 ? partner.articolo : g1.articolo;
+        righeFinali.push({ ambito: g1.ambito, articoloLabel: `${artA} → ${artB}`, v2025, v2026 });
+      } else {
+        usati.add(i1);
+        righeFinali.push({ ambito: g1.ambito, articoloLabel: g1.articolo, v2025: g1.anni[2025] || 0, v2026: g1.anni[2026] || 0 });
+      }
+    });
+
+    righeFinali.forEach(rf => {
+      const regioneKey = o.regione === "Basilicata" ? "Basilicata" : "Puglia";
+      const mapKey = `${regioneKey}|||${rf.ambito}`;
+      if (!gruppiMap[mapKey]) gruppiMap[mapKey] = { regione: regioneKey, ambito: rf.ambito, righe: [] };
+      if (rf.v2025 === 0 && rf.v2026 === 0) return;
+      const variazione = rf.v2025 > 0 ? ((rf.v2026 - rf.v2025) / rf.v2025) * 100 : null;
 
       gruppiMap[mapKey].righe.push({
         denominazione: o.denominazione,
         comune: o.comune, sigla_provincia: o.sigla_provincia,
-        v2025, v2026, variazione, articoloLabel,
+        v2025: rf.v2025, v2026: rf.v2026, variazione, articoloLabel: rf.articoloLabel,
         orgRef: o,
       });
     });
@@ -1086,6 +1122,10 @@ function ReportModal({ organismi, modalita, onClose, onSelectOrg }) {
               </>
             )}
 
+            <div style={{ marginTop: 24, padding: "10px 14px", background: "#f5f5f5", border: "1px solid #ccc", fontSize: 10.5 }}>
+              <strong>Legenda:</strong> il titolo grigio sopra ogni tabella indica l'<strong>Ambito</strong> di finanziamento (es. Musica, Teatro, Danza). La colonna <strong>Articolo</strong> indica lo specifico articolo del decreto ministeriale (settore) sotto cui rientra l'assegnazione; quando l'articolo cambia tra il 2025 e il 2026 per lo stesso organismo, viene mostrato come "Art. X → Art. Y".
+            </div>
+
             <div className="footer">
               AGIS Puglia e Basilicata — Gestionale Contributi Spettacolo dal Vivo — Dati MIC/DG Spettacolo e Regione Puglia
             </div>
@@ -1114,7 +1154,7 @@ function esportaExcel(organismi) {
     o.assegnazioni.forEach(a => {
       if (a.tipo_decreto === "REG_PU") {
         if (reg[a.anno] !== undefined) reg[a.anno] += (a.contributo_assegnato || 0);
-      } else if (DECRETI_MADRE_FNSV.includes(String(a.numero_rep))) {
+      } else if (DECRETI_MADRE_FNSV.includes(String(a.numero_rep)) && !(a.descrizione_settore || "").toLowerCase().includes("tournee") && !(a.descrizione_settore || "").toLowerCase().includes("tournée")) {
         if (mic[a.anno] !== undefined) mic[a.anno] += (a.contributo_assegnato || 0);
       }
     });
